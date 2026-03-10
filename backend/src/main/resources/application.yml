@@ -8,10 +8,13 @@ spring:
     banner-mode: console
 
   datasource:
-    url: jdbc:postgresql://neondb_owner:npg_aD2djilPCIp3@ep-summer-block-abn9eqqu-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+    url: jdbc:postgresql://ep-summer-block-abn9eqqu-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+    username: neondb_owner
+    password: npg_aD2djilPCIp3
     driver-class-name: org.postgresql.Driver
 
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
     open-in-view: false
