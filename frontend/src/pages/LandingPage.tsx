@@ -1,7 +1,9 @@
 import {
+    AudioLines,
     BrainCircuit,
     CalendarClock,
-    CheckCircle2,
+    MessageCircleMore,
+    Play,
     Sparkles,
     TimerReset,
     Video,
@@ -51,10 +53,10 @@ export function LandingPage() {
 
   return (
     <div className="relative overflow-hidden pb-20">
-      <div className="mx-auto w-full max-w-6xl px-4 pt-6 sm:px-6 lg:px-8">
-        <header className="reveal-up flex items-center justify-between rounded-2xl border border-white/70 bg-white/70 px-4 py-3 shadow-panel backdrop-blur-sm sm:px-5">
+      <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+        <header className="reveal-up sticky top-3 z-50 flex items-center justify-between rounded-2xl border border-white/80 bg-white/85 px-4 py-3 shadow-panel backdrop-blur-md sm:px-5">
           <Logo />
-          <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
+          <nav className="hidden items-center gap-7 text-base text-muted-foreground md:flex">
             <a href="#features" className="hover:text-foreground">
               Features
             </a>
@@ -92,16 +94,18 @@ export function LandingPage() {
           </div>
         </header>
 
-        <section className="grid gap-8 pb-12 pt-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-12 lg:pt-16">
-          <div>
-            <p className="reveal-up display-font inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+        <section className="grid gap-8 pb-12 pt-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 lg:pt-16">
+          <div className="order-2 lg:order-1">
+            <p className="reveal-up display-font inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold uppercase tracking-[0.12em] text-primary">
               <Sparkles size={14} />
               AI-powered speech growth
             </p>
-            <h1 className="reveal-up delay-1 display-font mt-6 text-4xl font-semibold leading-tight tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-              Become the clearest voice in every room.
+            <h1 className="reveal-up delay-1 display-font mt-5 text-4xl font-semibold leading-[1.02] tracking-tight text-foreground sm:text-6xl lg:text-7xl">
+              Sound sharp,
+              <br />
+              calm, and unforgettable.
             </h1>
-            <p className="reveal-up delay-2 mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+            <p className="reveal-up delay-2 mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-xl">
               Voxly helps you master public speaking, interviews, and high-stakes
               conversations with adaptive AI coaching. Train with realistic prompts,
               hear your blind spots, and build delivery that feels natural.
@@ -115,49 +119,95 @@ export function LandingPage() {
                   I already have access
                 </Button>
               </Link>
+              <Link to="/register">
+                <Button variant="ghost" size="lg" className="border border-primary/20 bg-white/70">
+                  Start first practice free
+                </Button>
+              </Link>
             </div>
-            <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="mt-8 hidden grid-cols-2 gap-3 sm:grid sm:grid-cols-3">
               {stats.map((stat) => (
-                <Card key={stat.label} className="p-4">
-                  <p className="display-font text-xl font-semibold text-foreground sm:text-2xl">
+                <Card key={stat.label} className="p-5">
+                  <p className="display-font text-2xl font-semibold text-foreground sm:text-3xl">
                     {stat.value}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{stat.label}</p>
                 </Card>
               ))}
             </div>
+            <div className="mt-5 hidden flex-wrap items-center gap-3 sm:flex">
+              <Link to="/register" className="text-sm font-semibold text-primary hover:text-primary/85">
+                Claim free onboarding session
+              </Link>
+              <span className="text-sm text-muted-foreground">No card required</span>
+            </div>
           </div>
 
-          <Card className="reveal-up delay-2 relative h-fit border-primary/20 bg-gradient-to-b from-white via-white to-primary/5 p-5 sm:p-7">
-            <div className="mb-5 flex items-center justify-between">
-              <p className="display-font text-lg font-semibold">Today Practice Plan</p>
-              <span className="rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">
+          <Card className="reveal-up delay-2 order-1 relative h-fit overflow-hidden border-primary/20 bg-gradient-to-b from-white via-white to-primary/5 p-5 sm:p-8 lg:order-2">
+            <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-primary/15 blur-3xl" />
+            <div className="absolute -bottom-14 left-8 h-44 w-44 rounded-full bg-accent/20 blur-3xl" />
+            <div className="relative mb-5 flex items-center justify-between">
+              <p className="display-font text-xl font-semibold sm:text-2xl">Live Session Preview</p>
+              <span className="rounded-full bg-accent px-3 py-1 text-sm font-semibold text-accent-foreground">
                 14 min
               </span>
             </div>
-            <div className="space-y-3 text-sm">
-              {[
-                'Warm-up articulation drill',
-                'Interview story response',
-                'Public speaking pacing challenge',
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2"
-                >
-                  <CheckCircle2 size={16} className="text-primary" />
-                  <span>{item}</span>
-                </div>
-              ))}
+            <div className="relative rounded-2xl border border-border bg-white/95 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <AudioLines size={16} className="text-primary" />
+                  Speaking Audio
+                </p>
+                <button className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Play size={14} />
+                </button>
+              </div>
+              <div className="flex items-end gap-1.5">
+                {[16, 28, 20, 38, 14, 26, 34, 18, 24, 30, 12, 26, 20].map((height, index) => (
+                  <span
+                    key={`${height}-${index}`}
+                    className="w-1.5 rounded-full bg-primary/70"
+                    style={{ height }}
+                  />
+                ))}
+              </div>
+              <div className="mt-4 sm:hidden">
+                <Link to="/register">
+                  <Button className="w-full">Try this voice coaching flow</Button>
+                </Link>
+              </div>
             </div>
-            <div className="mt-5 rounded-xl border border-primary/20 bg-primary/10 p-4">
-              <p className="text-xs uppercase tracking-[0.12em] text-primary">
-                AI Tip of the day
+
+            <div className="relative mt-4 hidden rounded-2xl border border-border bg-white p-4 sm:block">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+                <MessageCircleMore size={16} className="text-primary" />
+                AI Coach Suggestions
               </p>
-              <p className="mt-2 text-sm text-foreground">
-                Pause one second before key points. That tiny silence makes your
-                message sound intentional and confident.
-              </p>
+              <div className="mt-3 space-y-2 text-sm">
+                <div className="rounded-xl bg-primary/10 px-3 py-2">
+                  <span className="mr-2 font-semibold text-primary">00:08</span>
+                  Slow down before your key result metric.
+                </div>
+                <div className="rounded-xl bg-accent/15 px-3 py-2">
+                  <span className="mr-2 font-semibold text-accent-foreground">00:15</span>
+                  Good tone. Add a short pause after "team lead".
+                </div>
+              </div>
+            </div>
+
+            <div className="relative mt-4 hidden rounded-2xl border border-primary/20 bg-primary/10 p-5 sm:block">
+              <p className="text-sm uppercase tracking-[0.08em] text-primary">Live Transcript</p>
+              <div className="mt-3 space-y-2 text-sm text-foreground/90">
+                <p>
+                  <span className="font-semibold text-primary">00:05</span> I led the product kickoff for a cross-functional group...
+                </p>
+                <p>
+                  <span className="font-semibold text-primary">00:09</span> ...and I aligned engineering and design on milestones.
+                </p>
+                <p>
+                  <span className="font-semibold text-primary">00:14</span> We delivered two weeks early with fewer revisions.
+                </p>
+              </div>
             </div>
           </Card>
         </section>
@@ -181,6 +231,11 @@ export function LandingPage() {
                 </p>
               </Card>
             ))}
+          </div>
+          <div className="pt-2">
+            <Link to="/register">
+              <Button size="lg">Create Voxly account</Button>
+            </Link>
           </div>
         </section>
 
@@ -230,6 +285,9 @@ export function LandingPage() {
                 <Button variant="secondary" className="border-white/20 bg-white/15 text-white hover:bg-white/20">
                   Get started with Voxly
                 </Button>
+              </Link>
+              <Link to="/register" className="ml-3 inline-block text-sm font-semibold text-white/90 underline underline-offset-4 hover:text-white">
+                Register and run your first interview simulation
               </Link>
             </div>
           </Card>

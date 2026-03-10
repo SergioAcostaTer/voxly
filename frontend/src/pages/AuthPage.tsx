@@ -73,9 +73,9 @@ export function AuthPage({ mode }: AuthPageProps) {
   }
 
   return (
-    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:py-12">
-      <div className="mx-auto w-full max-w-6xl">
-        <div className="mb-6 flex items-center justify-between">
+    <div className="flex min-h-[100svh] items-center px-4 py-6 sm:px-6 sm:py-8 lg:block lg:py-12">
+      <div className="mx-auto w-full max-w-7xl">
+        <div className="mb-6 hidden items-center justify-between lg:flex">
           <Logo />
           <Link
             to="/"
@@ -86,11 +86,11 @@ export function AuthPage({ mode }: AuthPageProps) {
           </Link>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
-          <Card className="relative overflow-hidden border-primary/20 bg-gradient-to-br from-primary/95 to-cyan-700 text-white">
+        <div className="mx-auto grid w-full max-w-xl gap-5 lg:max-w-none lg:grid-cols-[0.95fr_1.05fr]">
+          <Card className="relative hidden overflow-hidden border-primary/20 bg-gradient-to-br from-primary/95 to-cyan-700 text-white lg:block">
             <div className="absolute -left-8 top-8 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
             <div className="absolute -bottom-10 right-2 h-48 w-48 rounded-full bg-accent/40 blur-3xl" />
-            <div className="relative space-y-5 p-2 sm:p-4">
+            <div className="relative space-y-5 p-4">
               <p className="display-font text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
                 Voxly AI Coach
               </p>
@@ -114,20 +114,30 @@ export function AuthPage({ mode }: AuthPageProps) {
             </div>
           </Card>
 
-          <Card className="bg-white/85 p-6 sm:p-8">
-            <p className="display-font text-2xl font-semibold tracking-tight text-foreground">
+          <Card className="bg-white/90 p-6 sm:p-8 lg:p-10">
+            <div className="mb-5 flex items-center justify-between lg:hidden">
+              <Logo />
+              <Link
+                to="/"
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
+              >
+                <ArrowLeft size={16} />
+                Home
+              </Link>
+            </div>
+            <p className="display-font text-3xl font-semibold tracking-tight text-foreground">
               {isLogin ? 'Log in to Voxly' : 'Create your account'}
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-2 text-base text-muted-foreground">
               {isLogin
                 ? 'Enter your credentials to continue practicing.'
                 : 'Set up your profile and begin with a free plan.'}
             </p>
 
-            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+            <form className="mt-7 space-y-5" onSubmit={handleSubmit}>
               {!isLogin ? (
                 <label className="block space-y-1.5">
-                  <span className="text-sm font-medium">Username</span>
+                  <span className="text-base font-medium">Username</span>
                   <Input
                     placeholder="jane_doe"
                     value={username}
@@ -138,7 +148,7 @@ export function AuthPage({ mode }: AuthPageProps) {
               ) : null}
 
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium">
+                <span className="text-base font-medium">
                   {isLogin ? 'Email or username' : 'Email'}
                 </span>
                 <Input
@@ -155,7 +165,7 @@ export function AuthPage({ mode }: AuthPageProps) {
               </label>
 
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium">Password</span>
+                <span className="text-base font-medium">Password</span>
                 <Input
                   type="password"
                   placeholder="********"
@@ -167,7 +177,7 @@ export function AuthPage({ mode }: AuthPageProps) {
 
               {isLogin ? (
                 <label className="block space-y-1.5">
-                  <span className="text-sm font-medium">2FA Code (optional)</span>
+                  <span className="text-base font-medium">2FA Code (optional)</span>
                   <Input
                     placeholder="123456"
                     value={twoFactorCode}
@@ -191,7 +201,7 @@ export function AuthPage({ mode }: AuthPageProps) {
               </Button>
             </form>
 
-            <p className="mt-5 text-center text-sm text-muted-foreground">
+            <p className="mt-6 text-center text-base text-muted-foreground">
               {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
               <Link
                 to={isLogin ? '/register' : '/login'}
