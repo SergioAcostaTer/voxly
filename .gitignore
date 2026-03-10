@@ -1,37 +1,90 @@
-HELP.md
-.gradle
+# ------------------------------
+# General
+# ------------------------------
+.DS_Store
+Thumbs.db
+*.log
+logs
+*.tmp
+*.swp
+
+# ------------------------------
+# Environment files
+# ------------------------------
+.env
+.env.*
+!.env.example
+
+# ------------------------------
+# Node / Vite / React
+# ------------------------------
+node_modules/
+dist/
+dist-ssr/
+.vite/
+coverage/
+
+# Vite cache
+node_modules/.vite
+
+# ------------------------------
+# Java / Spring Boot
+# ------------------------------
+target/
 build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
+*.class
+*.jar
+*.war
+*.ear
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
+# Maven
+.mvn/wrapper/maven-wrapper.jar
 
-### IntelliJ IDEA ###
-.idea
-*.iws
+# Gradle
+.gradle/
+build/
+
+# ------------------------------
+# IDEs
+# ------------------------------
+
+# VSCode
+.vscode/
+
+# IntelliJ / JetBrains
+.idea/
 *.iml
 *.ipr
+*.iws
 out/
-!**/src/main/**/out/
-!**/src/test/**/out/
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
+# Eclipse
+.project
+.classpath
+.settings/
 
-### VS Code ###
-.vscode/
+# ------------------------------
+# OS files
+# ------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+ehthumbs.db
+Desktop.ini
+
+# ------------------------------
+# Testing / coverage
+# ------------------------------
+coverage/
+*.lcov
+
+# ------------------------------
+# Misc
+# ------------------------------
+*.pid
+*.seed
+*.pid.lock
+
+.*/

@@ -1,5 +1,11 @@
 package com.pigs.voxly.api.identity;
 
+import java.net.http.HttpHeaders;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
 import com.pigs.voxly.api.identity.cookie.RefreshTokenCookieHelper;
 import com.pigs.voxly.api.identity.dto.AccessTokenResponse;
 import com.pigs.voxly.api.identity.dto.LoginApiResponse;
@@ -12,15 +18,12 @@ import com.pigs.voxly.application.identity.AuthService;
 import com.pigs.voxly.application.identity.dto.LoginRequest;
 import com.pigs.voxly.application.identity.dto.RegisterRequest;
 import com.pigs.voxly.application.identity.dto.UserResponse;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/v1/auth")
 @Tag(name = "Authentication", description = "Register, login, logout, token refresh, email verification, password reset, and 2FA")
 public class AuthController {
 
@@ -39,8 +42,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Login with email/username and password",
-            description = "Returns access token in body and refresh token as HttpOnly cookie. If 2FA is required, no tokens are issued.")
+    @Operation(summary = "Login with email/username and password", description = "Returns access token in body and refresh token as HttpOnly cookie. If 2FA is required, no tokens are issued.")
     public ResponseEntity<ApiResponse<LoginApiResponse>> login(@RequestBody LoginRequest request) {
         var result = authService.login(request);
 
@@ -56,7 +58,8 @@ public class AuthController {
         }
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookieHelper.createCookie(loginResponse.tokens().refreshToken()).toString())
+                .header(HttpHeaders.SET_COOKIE,
+                        cookieHelper.createCookie(loginResponse.tokens().refreshToken()).toString())
                 .body(ApiResponse.ok(apiResponse));
     }
 
