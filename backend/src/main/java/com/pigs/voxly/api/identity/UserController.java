@@ -1,18 +1,20 @@
 package com.pigs.voxly.api.identity;
 
+import java.util.UUID;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import com.pigs.voxly.api.shared.ApiResponse;
+import com.pigs.voxly.api.shared.ResultMapper;
 import com.pigs.voxly.application.identity.AuthService;
 import com.pigs.voxly.application.identity.UserService;
 import com.pigs.voxly.application.identity.dto.UserResponse;
 import com.pigs.voxly.application.identity.ports.CurrentUserProvider;
-import com.pigs.voxly.api.shared.ApiResponse;
-import com.pigs.voxly.api.shared.ResultMapper;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/v1/users")

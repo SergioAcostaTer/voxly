@@ -1,6 +1,9 @@
 package com.pigs.voxly.infrastructure.identity.security;
 
-import com.pigs.voxly.infrastructure.identity.config.JwtProperties;
+import java.nio.charset.StandardCharsets;
+
+import javax.crypto.spec.SecretKeySpec;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -11,8 +14,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
+import com.pigs.voxly.infrastructure.identity.config.JwtProperties;
 
 @Configuration
 @EnableWebSecurity

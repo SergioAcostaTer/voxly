@@ -1,10 +1,11 @@
 package com.pigs.voxly.api.identity.cookie;
 
-import com.pigs.voxly.infrastructure.identity.config.JwtProperties;
+import java.time.Duration;
+
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
+import com.pigs.voxly.infrastructure.identity.config.JwtProperties;
 
 @Component
 public class RefreshTokenCookieHelper {
