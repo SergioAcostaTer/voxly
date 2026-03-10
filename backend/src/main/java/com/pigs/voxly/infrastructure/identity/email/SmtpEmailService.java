@@ -25,7 +25,7 @@ public class SmtpEmailService implements EmailService {
 
     @Override
     public void sendEmailVerification(String to, String username, String verificationToken) {
-        String verificationUrl = mailProperties.baseUrl() + "/api/auth/verify-email?token=" + verificationToken;
+        String verificationUrl = mailProperties.baseUrl() + "/v1/auth/verify-email?token=" + verificationToken;
 
         String body = """
                 <h2>Welcome to VoxLy, %s!</h2>
@@ -40,7 +40,7 @@ public class SmtpEmailService implements EmailService {
 
     @Override
     public void sendPasswordReset(String to, String username, String resetToken) {
-        String resetUrl = mailProperties.baseUrl() + "/api/auth/reset-password?token=" + resetToken;
+        String resetUrl = mailProperties.baseUrl() + "/v1/auth/reset-password?token=" + resetToken;
 
         String body = """
                 <h2>Password Reset Request</h2>

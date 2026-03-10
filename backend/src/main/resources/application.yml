@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: VoxLy
+  output:
+    ansi:
+      enabled: ALWAYS
+  main:
+    banner-mode: console
+
+  datasource:
+    url: jdbc:postgresql://neondb_owner:npg_aD2djilPCIp3@ep-summer-block-abn9eqqu-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  mail:
+    host: localhost
+    port: 1025
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+  security:
+    user:
+      name: admin
+      password: admin
+
+server:
+  port: 8080
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  jwt:
+    secret-key: ZTQ5ZGU2MjctYzc5My00NjMwLTk3MTEtMzRkMGQyMjUyMzJkLXZveGx5LWRldi1rZXk
+    issuer: VoxLy
+    audience: VoxLy
+    access-token-expiry-minutes: 15
+    refresh-token-expiry-days: 7
+  mail:
+    from-email: noreply@voxly.com
+    from-name: VoxLy
+    base-url: http://localhost:8081

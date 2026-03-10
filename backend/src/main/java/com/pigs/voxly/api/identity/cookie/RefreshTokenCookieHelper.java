@@ -10,7 +10,7 @@ import java.time.Duration;
 public class RefreshTokenCookieHelper {
 
     static final String COOKIE_NAME = "refresh_token";
-    private static final String COOKIE_PATH = "/api/auth";
+    private static final String COOKIE_PATH = "/v1/auth";
 
     private final JwtProperties jwtProperties;
 

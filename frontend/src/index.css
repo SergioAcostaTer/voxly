@@ -1,68 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  --bg: 28 47% 96%;
+  --bg-soft: 28 60% 98%;
+  --foreground: 208 27% 17%;
+  --muted-foreground: 208 15% 36%;
+  --primary: 184 88% 29%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 24 95% 58%;
+  --accent-foreground: 0 0% 100%;
+  --card: 0 0% 100%;
+  --card-foreground: 208 27% 17%;
+  --border: 196 28% 82%;
+  --ring: 184 88% 35%;
+}
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+* {
+  border-color: hsl(var(--border));
+}
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: 'Manrope', sans-serif;
+  color: hsl(var(--foreground));
+  background:
+    radial-gradient(circle at 12% 15%, hsl(var(--accent) / 0.2), transparent 30%),
+    radial-gradient(circle at 80% 12%, hsl(var(--primary) / 0.2), transparent 36%),
+    linear-gradient(180deg, hsl(var(--bg-soft)) 0%, hsl(var(--bg)) 100%);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+  color: inherit;
+  text-decoration: none;
 }
 
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+.display-font {
+  font-family: 'Sora', sans-serif;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+.reveal-up {
+  animation: reveal-up 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+.reveal-up.delay-1 {
+  animation-delay: 90ms;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+.reveal-up.delay-2 {
+  animation-delay: 180ms;
+}
+
+.reveal-up.delay-3 {
+  animation-delay: 270ms;
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
   }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
