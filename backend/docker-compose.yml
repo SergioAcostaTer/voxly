@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: voxly-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: voxly
+      POSTGRES_USER: voxly
+      POSTGRES_PASSWORD: voxly
+    volumes:
+      - voxly-pgdata:/var/lib/postgresql/data
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: voxly-mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+volumes:
+  voxly-pgdata:
