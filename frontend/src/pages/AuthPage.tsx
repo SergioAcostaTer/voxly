@@ -45,7 +45,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         })
 
         const fromPath = (location.state as { from?: string } | null)?.from
-        navigate(fromPath || '/app', { replace: true })
+        navigate(fromPath || '/dashboard', { replace: true })
         return
       }
 
@@ -55,12 +55,10 @@ export function AuthPage({ mode }: AuthPageProps) {
         password,
       })
 
-      await login({
-        identifier: username,
-        password,
+      navigate('/login', {
+        replace: true,
+        state: { registered: true },
       })
-
-      navigate('/app', { replace: true })
     } catch (submitError) {
       setError(
         submitError instanceof Error

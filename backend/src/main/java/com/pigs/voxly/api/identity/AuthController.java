@@ -1,11 +1,12 @@
 package com.pigs.voxly.api.identity;
 
-import org.springframework.http.HttpHeaders;
+import java.net.http.HttpHeaders;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.pigs.voxly.api.identity.cookie.RefreshTokenCookieHelper;
+import com.pigs.voxly.api.identity.cookie.AccessTokenCookieHelper;
 import com.pigs.voxly.api.identity.dto.AccessTokenResponse;
 import com.pigs.voxly.api.identity.dto.LoginApiResponse;
 import com.pigs.voxly.api.identity.dto.RequestPasswordResetRequest;
@@ -27,9 +28,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class AuthController {
 
     private final AuthService authService;
-    private final RefreshTokenCookieHelper cookieHelper;
+    private final AccessTokenCookieHelper cookieHelper;
 
-    public AuthController(AuthService authService, RefreshTokenCookieHelper cookieHelper) {
+    public AuthController(AuthService authService, AccessTokenCookieHelper cookieHelper) {
         this.authService = authService;
         this.cookieHelper = cookieHelper;
     }
@@ -41,7 +42,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Login with email/username and password", description = "Returns access token in body and refresh token as HttpOnly cookie. If 2FA is required, no tokens are issued.")
+    @Operation(summary = "Login with email/username and password", description = "Returns access token in body and access token cookie. If 2FA is required, no tokens are issued.")
     public ResponseEntity<ApiResponse<LoginApiResponse>> login(@RequestBody LoginRequest request) {
         var result = authService.login(request);
 
@@ -63,17 +64,17 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Logout by revoking refresh token (read from cookie)")
+    @Operation(summary = "Logout by revoking cookie token")
     public ResponseEntity<ApiResponse<Void>> logout(
-            @CookieValue(name = "refresh_token", required = false) String refreshToken) {
+            @CookieValue(name = "access_token", required = false) String accessTokenCookie) {
 
-        if (refreshToken == null || refreshToken.isBlank()) {
+        if (accessTokenCookie == null || accessTokenCookie.isBlank()) {
             return ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, cookieHelper.clearCookie().toString())
                     .body(ApiResponse.ok());
         }
 
-        var result = authService.logout(refreshToken);
+        var result = authService.logout(accessTokenCookie);
 
         return ResponseEntity.status(result.isSuccess() ? HttpStatus.OK : HttpStatus.OK)
                 .header(HttpHeaders.SET_COOKIE, cookieHelper.clearCookie().toString())
@@ -81,16 +82,16 @@ public class AuthController {
     }
 
     @PostMapping("/refresh-token")
-    @Operation(summary = "Refresh access token using the refresh token cookie")
-    public ResponseEntity<ApiResponse<AccessTokenResponse>> refreshToken(
-            @CookieValue(name = "refresh_token", required = false) String refreshToken) {
+    @Operation(summary = "Issue a new access token using the cookie token")
+    public ResponseEntity<ApiResponse<AccessTokenResponse>> issueAccessToken(
+            @CookieValue(name = "access_token", required = false) String accessTokenCookie) {
 
-        if (refreshToken == null || refreshToken.isBlank()) {
+        if (accessTokenCookie == null || accessTokenCookie.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("AUTH.REFRESH_TOKEN_MISSING", "No refresh token provided."));
+                    .body(ApiResponse.error("AUTH.ACCESS_TOKEN_MISSING", "No access token cookie provided."));
         }
 
-        var result = authService.refreshToken(refreshToken);
+        var result = authService.refreshToken(accessTokenCookie);
 
         if (result.isFailure()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

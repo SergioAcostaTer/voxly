@@ -8,21 +8,21 @@ import org.springframework.stereotype.Component;
 import com.pigs.voxly.infrastructure.identity.config.JwtProperties;
 
 @Component
-public class RefreshTokenCookieHelper {
+public class AccessTokenCookieHelper {
 
-    static final String COOKIE_NAME = "refresh_token";
+    static final String COOKIE_NAME = "access_token";
     private static final String COOKIE_PATH = "/v1/auth";
 
     private final JwtProperties jwtProperties;
 
-    public RefreshTokenCookieHelper(JwtProperties jwtProperties) {
+    public AccessTokenCookieHelper(JwtProperties jwtProperties) {
         this.jwtProperties = jwtProperties;
     }
 
-    public ResponseCookie createCookie(String refreshToken) {
-        return ResponseCookie.from(COOKIE_NAME, refreshToken)
+    public ResponseCookie createCookie(String accessToken) {
+        return ResponseCookie.from(COOKIE_NAME, accessToken)
                 .httpOnly(true)
-                .secure(jwtProperties.refreshCookieSecure())
+                .secure(jwtProperties.accessCookieSecure())
                 .sameSite("Strict")
                 .path(COOKIE_PATH)
                 .maxAge(Duration.ofDays(jwtProperties.refreshTokenExpiryDays()))
@@ -32,7 +32,7 @@ public class RefreshTokenCookieHelper {
     public ResponseCookie clearCookie() {
         return ResponseCookie.from(COOKIE_NAME, "")
                 .httpOnly(true)
-                .secure(jwtProperties.refreshCookieSecure())
+                .secure(jwtProperties.accessCookieSecure())
                 .sameSite("Strict")
                 .path(COOKIE_PATH)
                 .maxAge(0)

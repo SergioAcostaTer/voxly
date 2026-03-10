@@ -8,13 +8,17 @@ public record JwtProperties(
         String issuer,
         String audience,
         int accessTokenExpiryMinutes,
-        int refreshTokenExpiryDays
-) {
+        int refreshTokenExpiryDays,
+        boolean accessCookieSecure) {
 
     public JwtProperties {
-        if (issuer == null) issuer = "VoxLy";
-        if (audience == null) audience = "VoxLy";
-        if (accessTokenExpiryMinutes <= 0) accessTokenExpiryMinutes = 15;
-        if (refreshTokenExpiryDays <= 0) refreshTokenExpiryDays = 7;
+        if (issuer == null)
+            issuer = "VoxLy";
+        if (audience == null)
+            audience = "VoxLy";
+        if (accessTokenExpiryMinutes <= 0)
+            accessTokenExpiryMinutes = 15;
+        if (refreshTokenExpiryDays <= 0)
+            refreshTokenExpiryDays = 7;
     }
 }

@@ -33,7 +33,7 @@ export function DashboardPage() {
             Welcome, {user?.username ?? 'Voxly user'}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-primary-foreground/85 sm:text-base">
-            Your auth flow is now connected to real backend endpoints with refresh-token cookie handling.
+            Your auth flow is now connected to real backend endpoints with access-token cookie handling.
           </p>
         </Card>
 

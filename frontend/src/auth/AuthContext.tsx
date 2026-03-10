@@ -14,34 +14,51 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const refreshMe = useCallback(async () => {
+  const loadProfileWithRefreshFallback = useCallback(async (token: string) => {
+    try {
+      const profile = await api.me(token)
+      return { profile, accessToken: token }
+    } catch (error) {
+      if (!(error instanceof ApiClientError) || error.status !== 401) {
+        throw error
+      }
+
+      const refreshed = await api.requestAccessToken()
+      const profile = await api.me(refreshed.accessToken)
+      return { profile, accessToken: refreshed.accessToken }
+    }
+  }, [])
+
+  const syncAccessToken = useCallback(async () => {
     if (!accessToken) {
       setUser(null)
       return
     }
 
     try {
-      const profile = await api.me(accessToken)
-      setUser(profile)
+      const session = await loadProfileWithRefreshFallback(accessToken)
+      setAccessToken(session.accessToken)
+      setUser(session.profile)
     } catch {
       setUser(null)
       setAccessToken(null)
     }
-  }, [accessToken])
+  }, [accessToken, loadProfileWithRefreshFallback])
 
   const bootstrapSession = useCallback(async () => {
     try {
-      const refreshed = await api.refreshToken()
+      const refreshed = await api.requestAccessToken()
       setAccessToken(refreshed.accessToken)
-      const profile = await api.me(refreshed.accessToken)
-      setUser(profile)
+      const session = await loadProfileWithRefreshFallback(refreshed.accessToken)
+      setAccessToken(session.accessToken)
+      setUser(session.profile)
     } catch {
       setAccessToken(null)
       setUser(null)
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [loadProfileWithRefreshFallback])
 
   useEffect(() => {
     void bootstrapSession()
@@ -90,9 +107,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       login,
       register,
       logout,
-      refreshMe,
+      syncAccessToken,
     }),
-    [accessToken, isLoading, login, logout, refreshMe, register, user],
+    [accessToken, isLoading, login, logout, register, syncAccessToken, user],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -17,7 +17,7 @@ function PublicOnlyAuthPage({ mode }: { mode: 'login' | 'register' }) {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/app" replace />
+    return <Navigate to="/dashboard" replace />
   }
 
   return <AuthPage mode={mode} />
@@ -31,13 +31,14 @@ function App() {
         <Route path="/login" element={<PublicOnlyAuthPage mode="login" />} />
         <Route path="/register" element={<PublicOnlyAuthPage mode="register" />} />
         <Route
-          path="/app"
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <DashboardPage />
             </ProtectedRoute>
           }
         />
+        <Route path="/app" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -9,7 +9,7 @@ export type AuthContextValue = {
   login: (payload: LoginPayload) => Promise<void>
   register: (payload: RegisterPayload) => Promise<void>
   logout: () => Promise<void>
-  refreshMe: () => Promise<void>
+  syncAccessToken: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

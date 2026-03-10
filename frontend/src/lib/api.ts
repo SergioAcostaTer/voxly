@@ -99,7 +99,7 @@ export const api = {
     })
   },
 
-  refreshToken() {
+  requestAccessToken() {
     return requestAuth<{ accessToken: string; accessTokenExpiresAt: string }>(
       '/refresh-token',
       {

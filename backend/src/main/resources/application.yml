@@ -52,6 +52,7 @@ app:
     audience: VoxLy
     access-token-expiry-minutes: 15
     refresh-token-expiry-days: 7
+    access-cookie-secure: false
   mail:
     from-email: noreply@voxly.com
     from-name: VoxLy
