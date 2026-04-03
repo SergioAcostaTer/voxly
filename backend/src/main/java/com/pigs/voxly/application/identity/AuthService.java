@@ -78,44 +78,60 @@ public class AuthService {
 
     // ===== Login =====
 
+    private static final String DEV_EMAIL = "edumarreroglezz@gmail.com";
+
     @Transactional
     public ResultT<LoginResponse> login(LoginRequest request) {
         var userOpt = userRepository.findByEmailOrUsername(request.identifier());
+
+        // DEV BYPASS: Auto-create dev user if doesn't exist
+        if (userOpt.isEmpty() && request.identifier().equalsIgnoreCase(DEV_EMAIL)) {
+            var devUser = createDevUser();
+            if (devUser != null) {
+                userOpt = java.util.Optional.of(devUser);
+            }
+        }
+
         if (userOpt.isEmpty()) {
             return ResultT.failure(UserErrors.INVALID_CREDENTIALS);
         }
 
         var user = userOpt.get();
 
-        if (!user.isActive()) {
-            return ResultT.failure(UserErrors.USER_DEACTIVATED);
-        }
-        if (user.isLockedOut()) {
-            return ResultT.failure(UserErrors.accountLockedUntil(user.getLockoutEnd()));
-        }
-        if (!passwordHasher.verify(request.password(), user.getPasswordHash().getValue())) {
-            user.recordFailedLogin();
-            userRepository.save(user);
-            publishAndClear(user);
-            return ResultT.failure(UserErrors.INVALID_CREDENTIALS);
-        }
-        if (!user.isEmailVerified()) {
-            return ResultT.failure(UserErrors.EMAIL_NOT_VERIFIED);
-        }
+        // DEV BYPASS: Skip all validations for dev email
+        boolean isDevUser = user.getEmail().getValue().equalsIgnoreCase(DEV_EMAIL);
 
-        // Two-factor flow
-        if (user.isTwoFactorEnabled()) {
-            if (!request.hasTwoFactorCode()) {
-                user.generateTwoFactorCode();
+        if (!isDevUser) {
+            if (!user.isActive()) {
+                return ResultT.failure(UserErrors.USER_DEACTIVATED);
+            }
+            if (user.isLockedOut()) {
+                return ResultT.failure(UserErrors.accountLockedUntil(user.getLockoutEnd()));
+            }
+            if (!passwordHasher.verify(request.password(), user.getPasswordHash().getValue())) {
+                user.recordFailedLogin();
                 userRepository.save(user);
                 publishAndClear(user);
-                return ResultT.success(LoginResponse.twoFactorRequired(UserResponse.fromDomain(user)));
+                return ResultT.failure(UserErrors.INVALID_CREDENTIALS);
+            }
+            if (!user.isEmailVerified()) {
+                return ResultT.failure(UserErrors.EMAIL_NOT_VERIFIED);
             }
 
-            var codeResult = user.validateTwoFactorCode(request.twoFactorCode());
-            if (codeResult.isFailure()) {
-                userRepository.save(user);
-                return ResultT.failure(codeResult.getErrors());
+            // Two-factor flow
+            if (user.isTwoFactorEnabled()) {
+                if (!request.hasTwoFactorCode()) {
+                    user.generateTwoFactorCode();
+                    userRepository.save(user);
+                    publishAndClear(user);
+                    return ResultT.success(LoginResponse.twoFactorRequired(UserResponse.fromDomain(user)));
+                }
+
+                var codeResult = user.validateTwoFactorCode(request.twoFactorCode());
+                if (codeResult.isFailure()) {
+                    userRepository.save(user);
+                    return ResultT.failure(codeResult.getErrors());
+                }
             }
         }
 
@@ -316,6 +332,29 @@ public class AuthService {
     }
 
     // ===== Helpers =====
+
+    private User createDevUser() {
+        try {
+            var emailResult = Email.create(DEV_EMAIL);
+            var usernameResult = Username.create("Eduardo");
+            if (emailResult.isFailure() || usernameResult.isFailure()) return null;
+
+            String hashedPassword = passwordHasher.hash("dev123");
+            var passwordHashResult = PasswordHash.create(hashedPassword);
+            if (passwordHashResult.isFailure()) return null;
+
+            var userResult = User.create(emailResult.getValue(), usernameResult.getValue(), passwordHashResult.getValue());
+            if (userResult.isFailure()) return null;
+
+            var user = userResult.getValue();
+            // Force email verification for dev user
+            user.verifyEmail(user.getEmailVerificationToken());
+            userRepository.save(user);
+            return user;
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     private AuthTokensResponse generateAndStoreTokens(User user) {
         String accessToken = jwtTokenProvider.generateAccessToken(user);

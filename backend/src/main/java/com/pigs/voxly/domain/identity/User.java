@@ -354,6 +354,17 @@ public final class User extends AggregateRoot<UserId> {
         markModified();
     }
 
+    // ===== Profile Update =====
+
+    public Result updateUsername(Username newUsername) {
+        if (this.username.equals(newUsername)) {
+            return Result.success();
+        }
+        this.username = newUsername;
+        markModified();
+        return Result.success();
+    }
+
     // ===== Getters =====
 
     public Email getEmail() {

@@ -9,12 +9,14 @@ import com.pigs.voxly.api.shared.ApiResponse;
 import com.pigs.voxly.api.shared.ResultMapper;
 import com.pigs.voxly.application.identity.AuthService;
 import com.pigs.voxly.application.identity.UserService;
+import com.pigs.voxly.application.identity.dto.UpdateProfileRequest;
 import com.pigs.voxly.application.identity.dto.UserResponse;
 import com.pigs.voxly.application.identity.ports.CurrentUserProvider;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/v1/users")
@@ -36,6 +38,20 @@ public class UserController {
     @Operation(summary = "Get the currently authenticated user's profile")
     public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser() {
         return ResultMapper.toResponse(userService.getCurrentUser());
+    }
+
+    @PatchMapping("/me")
+    @Operation(summary = "Update the current user's profile")
+    public ResponseEntity<ApiResponse<UserResponse>> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
+        UUID userId = currentUserProvider.getUserId().orElseThrow();
+        return ResultMapper.toResponse(userService.updateProfile(userId, request));
+    }
+
+    @DeleteMapping("/me")
+    @Operation(summary = "Deactivate the current user's account")
+    public ResponseEntity<ApiResponse<Void>> deactivateAccount() {
+        UUID userId = currentUserProvider.getUserId().orElseThrow();
+        return ResultMapper.toResponse(userService.deactivateAccount(userId));
     }
 
     @GetMapping("/{userId}")
