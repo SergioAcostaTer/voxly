@@ -1,5 +1,5 @@
-import { LogOut, Mic2, ShieldCheck } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { BarChart3, LogOut, Mic2, Plus, TrendingUp, Video } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
@@ -27,46 +27,99 @@ export function DashboardPage() {
 
         <Card className="bg-gradient-to-br from-primary to-cyan-700 text-primary-foreground">
           <p className="display-font text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground/80">
-            Your account
+            Welcome back
           </p>
           <h1 className="display-font mt-3 text-3xl font-semibold">
-            Welcome, {user?.username ?? 'Voxly user'}
+            {user?.username ?? 'Voxly user'}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-primary-foreground/85 sm:text-base">
-            Your auth flow is now connected to real backend endpoints with access-token cookie handling.
+            Practice your presentation skills with AI-powered feedback and analysis.
           </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link to="/sessions/new">
+              <Button className="bg-white text-primary hover:bg-white/90">
+                <Plus size={18} />
+                New Session
+              </Button>
+            </Link>
+            <Link to="/sessions">
+              <Button variant="ghost" className="border border-white/30 text-white hover:bg-white/20">
+                <Video size={18} />
+                View Sessions
+              </Button>
+            </Link>
+          </div>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <p className="display-font text-lg font-semibold text-foreground">Profile Snapshot</p>
-            <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-              <p>
-                <span className="font-semibold text-foreground">Email:</span> {user?.email}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Link to="/sessions/new" className="block">
+            <Card className="h-full transition-all hover:border-primary/40 hover:shadow-md">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                <Mic2 className="text-primary" size={24} />
+              </div>
+              <p className="display-font mt-4 text-lg font-semibold text-foreground">
+                Start Practicing
               </p>
-              <p>
-                <span className="font-semibold text-foreground">User ID:</span> {user?.id}
+              <p className="mt-2 text-sm text-muted-foreground">
+                Record a new presentation and get instant AI feedback on your delivery.
               </p>
-              <p>
-                <span className="font-semibold text-foreground">Roles:</span> {user?.roles.join(', ') || 'None'}
-              </p>
-            </div>
-          </Card>
+            </Card>
+          </Link>
 
-          <Card>
-            <p className="display-font text-lg font-semibold text-foreground">Security</p>
-            <div className="mt-4 flex items-start gap-3 text-sm text-muted-foreground">
-              <ShieldCheck className="mt-0.5 text-primary" size={18} />
-              <p>
-                Access token is sent as a bearer token for protected routes and refresh token stays in HttpOnly cookie.
+          <Link to="/sessions" className="block">
+            <Card className="h-full transition-all hover:border-primary/40 hover:shadow-md">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100">
+                <Video className="text-blue-600" size={24} />
+              </div>
+              <p className="display-font mt-4 text-lg font-semibold text-foreground">
+                My Sessions
               </p>
-            </div>
-            <div className="mt-3 flex items-start gap-3 text-sm text-muted-foreground">
-              <Mic2 className="mt-0.5 text-primary" size={18} />
-              <p>Next step: connect this dashboard to your real speech practice features.</p>
-            </div>
-          </Card>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Review past recordings, transcriptions, and feedback from your sessions.
+              </p>
+            </Card>
+          </Link>
+
+          <Link to="/progress" className="block">
+            <Card className="h-full transition-all hover:border-primary/40 hover:shadow-md">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100">
+                <TrendingUp className="text-green-600" size={24} />
+              </div>
+              <p className="display-font mt-4 text-lg font-semibold text-foreground">
+                Track Progress
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                See your improvement over time with detailed metrics and trends.
+              </p>
+            </Card>
+          </Link>
         </div>
+
+        <Card>
+          <div className="flex items-center gap-3">
+            <BarChart3 className="text-primary" size={20} />
+            <p className="display-font text-lg font-semibold text-foreground">Quick Stats</p>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-xl bg-muted/30 p-4 text-center">
+              <p className="text-2xl font-bold text-foreground">--</p>
+              <p className="mt-1 text-sm text-muted-foreground">Total Sessions</p>
+            </div>
+            <div className="rounded-xl bg-muted/30 p-4 text-center">
+              <p className="text-2xl font-bold text-foreground">--</p>
+              <p className="mt-1 text-sm text-muted-foreground">Avg. Clarity Score</p>
+            </div>
+            <div className="rounded-xl bg-muted/30 p-4 text-center">
+              <p className="text-2xl font-bold text-foreground">--</p>
+              <p className="mt-1 text-sm text-muted-foreground">Avg. WPM</p>
+            </div>
+          </div>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            <Link to="/progress" className="text-primary hover:underline">
+              View detailed progress
+            </Link>
+          </p>
+        </Card>
       </div>
     </div>
   )

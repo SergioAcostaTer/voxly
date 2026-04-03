@@ -4,6 +4,10 @@ import { useAuth } from './auth/useAuth'
 import { AuthPage } from './pages/AuthPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LandingPage } from './pages/LandingPage'
+import { NewSessionPage } from './pages/NewSessionPage'
+import { ProgressPage } from './pages/ProgressPage'
+import { SessionDetailPage } from './pages/SessionDetailPage'
+import { SessionsPage } from './pages/SessionsPage'
 
 function PublicOnlyAuthPage({ mode }: { mode: 'login' | 'register' }) {
   const { isAuthenticated, isLoading } = useAuth()
@@ -35,6 +39,38 @@ function App() {
           element={
             <ProtectedRoute>
               <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sessions"
+          element={
+            <ProtectedRoute>
+              <SessionsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sessions/new"
+          element={
+            <ProtectedRoute>
+              <NewSessionPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sessions/:sessionId"
+          element={
+            <ProtectedRoute>
+              <SessionDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/progress"
+          element={
+            <ProtectedRoute>
+              <ProgressPage />
             </ProtectedRoute>
           }
         />
