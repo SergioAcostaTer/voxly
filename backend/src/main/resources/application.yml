@@ -57,3 +57,14 @@ app:
     from-email: noreply@voxly.com
     from-name: VoxLy
     base-url: http://localhost:8081
+  storage:
+    type: local
+    local-path: ./uploads
+    base-url: /api/v1/files
+    max-file-size-bytes: 104857600
+  ai:
+    provider: mock
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      model: gpt-4
+      whisper-model: whisper-1

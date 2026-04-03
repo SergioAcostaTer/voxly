@@ -1,0 +1,47 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  mail:
+    host: ${SMTP_HOST}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME}
+    password: ${SMTP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+server:
+  port: ${PORT:8080}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  jwt:
+    secret-key: ${JWT_SECRET_KEY}
+    access-cookie-secure: true
+  mail:
+    base-url: ${APP_BASE_URL:https://voxly.com}
+  storage:
+    type: ${STORAGE_TYPE:local}
+    local-path: ${STORAGE_PATH:/data/uploads}
+    base-url: ${STORAGE_BASE_URL:/api/v1/files}
+    max-file-size-bytes: ${MAX_FILE_SIZE:104857600}
+  ai:
+    provider: ${AI_PROVIDER:openai}
+    openai:
+      api-key: ${OPENAI_API_KEY}

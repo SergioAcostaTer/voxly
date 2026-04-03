@@ -13,5 +13,4 @@ public class VoxLyApplication {
     public static void main(String[] args) {
         SpringApplication.run(VoxLyApplication.class, args);
     }
-
 }
