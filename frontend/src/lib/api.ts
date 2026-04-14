@@ -124,10 +124,11 @@ export const api = {
   },
 
   // Sessions
-  getSessions(accessToken: string, page = 1, size = 10) {
-    return request<SessionListResponse>(`/v1/sessions?page=${page}&size=${size}`, {
+  async getSessions(accessToken: string, page = 1, size = 10) {
+    const response = await request<SessionListResponse>(`/v1/sessions?page=${page}&size=${size}`, {
       accessToken,
     })
+    return response
   },
 
   getSession(accessToken: string, sessionId: string) {
@@ -155,7 +156,7 @@ export const api = {
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await fetch(`/v1/sessions/${sessionId}/media`, {
+    const response = await fetch(`${API_BASE_URL}/v1/sessions/${sessionId}/media`, {
       method: 'POST',
       credentials: 'include',
       headers: {

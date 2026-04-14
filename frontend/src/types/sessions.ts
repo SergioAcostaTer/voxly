@@ -1,30 +1,38 @@
-export type SessionType = 'PRESENTATION' | 'INTERVIEW' | 'PITCH' | 'FREESTYLE'
-export type SessionStatus = 'DRAFT' | 'UPLOADED' | 'ANALYZING' | 'COMPLETED' | 'FAILED'
+export type SessionType = 'presentation' | 'interview' | 'pitch' | 'freestyle'
+export type SessionStatus = 'draft' | 'uploaded' | 'analyzing' | 'completed' | 'failed'
+
+export type MediaFile = {
+  storagePath: string
+  originalFileName: string
+  contentType: string
+  sizeBytes: number
+  durationSeconds: number | null
+  url: string
+}
 
 export type Session = {
   id: string
+  userId: string
   title: string
-  type: SessionType
+  description: string | null
+  sessionType: string
   status: SessionStatus
-  mediaPath: string | null
-  contentType: string | null
-  durationSeconds: number | null
+  mediaFile: MediaFile | null
   evaluationId: string | null
   createdAt: string
-  updatedAt: string
+  modifiedAt: string
 }
 
 export type CreateSessionRequest = {
   title: string
-  type: SessionType
+  sessionType: string
+  description?: string
 }
 
 export type SessionListResponse = {
-  items: Session[]
-  pageNumber: number
-  pageSize: number
-  totalItems: number
+  sessions: Session[]
+  page: number
+  size: number
+  totalElements: number
   totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
 }

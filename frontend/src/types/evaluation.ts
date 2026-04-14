@@ -1,23 +1,30 @@
-export type EvaluationStatus = 'PENDING' | 'TRANSCRIBING' | 'ANALYZING' | 'COMPLETED' | 'FAILED'
+export type EvaluationStatus = 'pending' | 'transcribing' | 'analyzing' | 'completed' | 'failed'
+
+export type TranscriptionData = {
+  fullText: string
+  durationSeconds: number | null
+  detectedLanguage: string | null
+}
 
 export type EvaluationMetrics = {
-  clarityScore: number | null
   wordsPerMinute: number | null
+  totalWords: number | null
   fillerWordCount: number | null
   pauseCount: number | null
-  averagePauseDuration: number | null
+  clarityScore: number | null
 }
 
 export type FeedbackData = {
-  notesJson: string | null
   overallSummary: string | null
+  notesJson: string | null
 }
 
 export type Evaluation = {
   id: string
   sessionId: string
   status: EvaluationStatus
-  transcription: string | null
+  sessionType: string | null
+  transcription: TranscriptionData | null
   metrics: EvaluationMetrics | null
   feedback: FeedbackData | null
   errorMessage: string | null
