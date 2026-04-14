@@ -23,6 +23,11 @@ spring:
       hibernate:
         format_sql: true
 
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
   mail:
     host: localhost
     port: 1025
@@ -63,8 +68,9 @@ app:
     base-url: /api/v1/files
     max-file-size-bytes: 104857600
   ai:
-    provider: mock
+    provider: openai
     openai:
-      api-key: ${OPENAI_API_KEY:}
-      model: gpt-4
-      whisper-model: whisper-1
+      api-key: ${GROQ_API_KEY:}
+      base-url: https://api.groq.com/openai/v1
+      model: llama-3.3-70b-versatile
+      whisper-model: whisper-large-v3-turbo
