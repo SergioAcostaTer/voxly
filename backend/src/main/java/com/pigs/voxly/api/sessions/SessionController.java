@@ -4,7 +4,6 @@ import com.pigs.voxly.api.shared.ApiResponse;
 import com.pigs.voxly.api.shared.ResultMapper;
 import com.pigs.voxly.application.sessions.SessionService;
 import com.pigs.voxly.application.sessions.dto.*;
-import com.pigs.voxly.infrastructure.shared.dev.DevMockDataService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,11 +22,9 @@ import java.util.UUID;
 public class SessionController {
 
     private final SessionService sessionService;
-    private final DevMockDataService devMockDataService;
 
-    public SessionController(SessionService sessionService, DevMockDataService devMockDataService) {
+    public SessionController(SessionService sessionService) {
         this.sessionService = sessionService;
-        this.devMockDataService = devMockDataService;
     }
 
     @PostMapping
@@ -44,18 +41,12 @@ public class SessionController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        if (devMockDataService.isDevUser()) {
-            return ResponseEntity.ok(ApiResponse.ok(devMockDataService.getMockSessions()));
-        }
         return ResultMapper.toResponse(sessionService.getUserSessions(page, size));
     }
 
     @GetMapping("/{sessionId}")
     @Operation(summary = "Get a session by ID")
     public ResponseEntity<ApiResponse<SessionResponse>> getSession(@PathVariable UUID sessionId) {
-        if (devMockDataService.isDevUser()) {
-            return ResponseEntity.ok(ApiResponse.ok(devMockDataService.getMockSession(sessionId)));
-        }
         return ResultMapper.toResponse(sessionService.getSession(sessionId));
     }
 

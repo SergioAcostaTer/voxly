@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pigs.voxly.api.shared.ApiResponse;
 import com.pigs.voxly.application.evaluation.EvaluationService;
 import com.pigs.voxly.application.shared.ports.SpeechAnalysisService;
-import com.pigs.voxly.infrastructure.shared.dev.DevMockDataService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,21 +24,15 @@ public class FeedbackController {
 
     private final EvaluationService evaluationService;
     private final ObjectMapper objectMapper;
-    private final DevMockDataService devMockDataService;
 
-    public FeedbackController(EvaluationService evaluationService, ObjectMapper objectMapper, DevMockDataService devMockDataService) {
+    public FeedbackController(EvaluationService evaluationService, ObjectMapper objectMapper) {
         this.evaluationService = evaluationService;
         this.objectMapper = objectMapper;
-        this.devMockDataService = devMockDataService;
     }
 
     @GetMapping("/session/{sessionId}")
     @Operation(summary = "Get all feedback notes for a session")
     public ResponseEntity<ApiResponse<FeedbackResponse>> getFeedbackForSession(@PathVariable UUID sessionId) {
-        if (devMockDataService.isDevUser()) {
-            return ResponseEntity.ok(ApiResponse.ok(devMockDataService.getMockFeedback(sessionId)));
-        }
-
         var evalResult = evaluationService.getEvaluationBySessionId(sessionId);
 
         if (evalResult.isFailure()) {

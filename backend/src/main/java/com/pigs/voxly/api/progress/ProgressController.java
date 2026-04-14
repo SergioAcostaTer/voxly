@@ -6,7 +6,6 @@ import com.pigs.voxly.domain.evaluation.EvaluationRepository;
 import com.pigs.voxly.domain.identity.UserId;
 import com.pigs.voxly.domain.sessions.SessionRepository;
 import com.pigs.voxly.domain.sessions.enumerations.SessionStatus;
-import com.pigs.voxly.infrastructure.shared.dev.DevMockDataService;
 import com.pigs.voxly.sharedKernel.domain.pagination.PagedRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -26,27 +25,20 @@ public class ProgressController {
     private final SessionRepository sessionRepository;
     private final EvaluationRepository evaluationRepository;
     private final CurrentUserProvider currentUserProvider;
-    private final DevMockDataService devMockDataService;
 
     public ProgressController(
             SessionRepository sessionRepository,
             EvaluationRepository evaluationRepository,
-            CurrentUserProvider currentUserProvider,
-            DevMockDataService devMockDataService
+            CurrentUserProvider currentUserProvider
     ) {
         this.sessionRepository = sessionRepository;
         this.evaluationRepository = evaluationRepository;
         this.currentUserProvider = currentUserProvider;
-        this.devMockDataService = devMockDataService;
     }
 
     @GetMapping("/summary")
     @Operation(summary = "Get user's progress summary")
     public ResponseEntity<ApiResponse<ProgressSummary>> getProgressSummary() {
-        if (devMockDataService.isDevUser()) {
-            return ResponseEntity.ok(ApiResponse.ok(devMockDataService.getMockProgressSummary()));
-        }
-
         var userIdOpt = currentUserProvider.getUserId();
         if (userIdOpt.isEmpty()) {
             return ResponseEntity.status(401).build();
@@ -100,10 +92,6 @@ public class ProgressController {
     public ResponseEntity<ApiResponse<List<SessionTrend>>> getProgressTrends(
             @RequestParam(defaultValue = "10") int limit
     ) {
-        if (devMockDataService.isDevUser()) {
-            return ResponseEntity.ok(ApiResponse.ok(devMockDataService.getMockProgressTrends()));
-        }
-
         var userIdOpt = currentUserProvider.getUserId();
         if (userIdOpt.isEmpty()) {
             return ResponseEntity.status(401).build();
