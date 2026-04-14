@@ -11,10 +11,10 @@ import { Logo } from '../ui/Logo'
 import { Select } from '../ui/Select'
 
 const SESSION_TYPES: { value: SessionType; label: string; description: string }[] = [
-  { value: 'PRESENTATION', label: 'Presentation', description: 'Formal business or educational presentation' },
-  { value: 'PITCH', label: 'Pitch', description: 'Startup or product pitch' },
-  { value: 'INTERVIEW', label: 'Interview', description: 'Practice for job or media interviews' },
-  { value: 'FREESTYLE', label: 'Freestyle', description: 'Impromptu speaking practice' },
+  { value: 'presentation', label: 'Presentation', description: 'Formal business or educational presentation' },
+  { value: 'pitch', label: 'Pitch', description: 'Startup or product pitch' },
+  { value: 'interview', label: 'Interview', description: 'Practice for job or media interviews' },
+  { value: 'freestyle', label: 'Freestyle', description: 'Impromptu speaking practice' },
 ]
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
@@ -24,7 +24,7 @@ export function NewSessionPage() {
   const { accessToken, logout } = useAuth()
 
   const [title, setTitle] = useState('')
-  const [type, setType] = useState<SessionType>('PRESENTATION')
+  const [type, setType] = useState<SessionType>('presentation')
   const [file, setFile] = useState<File | null>(null)
   const [dragActive, setDragActive] = useState(false)
 
@@ -86,7 +86,7 @@ export function NewSessionPage() {
     setError(null)
 
     try {
-      const session = await api.createSession(accessToken, { title: title.trim(), type })
+      const session = await api.createSession(accessToken, { title: title.trim(), sessionType: type })
       setSessionId(session.id)
       setStep('upload')
     } catch (err) {

@@ -19,11 +19,11 @@ import { Card } from '../ui/Card'
 import { Logo } from '../ui/Logo'
 
 const statusConfig: Record<SessionStatus, { icon: typeof Clock; color: string; label: string }> = {
-  DRAFT: { icon: Clock, color: 'text-muted-foreground', label: 'Draft' },
-  UPLOADED: { icon: Video, color: 'text-blue-500', label: 'Uploaded' },
-  ANALYZING: { icon: Loader2, color: 'text-amber-500', label: 'Analyzing' },
-  COMPLETED: { icon: CheckCircle, color: 'text-green-500', label: 'Completed' },
-  FAILED: { icon: AlertCircle, color: 'text-red-500', label: 'Failed' },
+  draft: { icon: Clock, color: 'text-muted-foreground', label: 'Draft' },
+  uploaded: { icon: Video, color: 'text-blue-500', label: 'Uploaded' },
+  analyzing: { icon: Loader2, color: 'text-amber-500', label: 'Analyzing' },
+  completed: { icon: CheckCircle, color: 'text-green-500', label: 'Completed' },
+  failed: { icon: AlertCircle, color: 'text-red-500', label: 'Failed' },
 }
 
 export function SessionsPage() {
@@ -38,7 +38,7 @@ export function SessionsPage() {
     if (!accessToken) return
     try {
       const response = await api.getSessions(accessToken)
-      setSessions(response.items)
+      setSessions(response.sessions)
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
         await logout()
@@ -168,9 +168,9 @@ export function SessionsPage() {
                       <div
                         className={cn(
                           'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl',
-                          session.status === 'COMPLETED'
+                          session.status === 'completed'
                             ? 'bg-green-100'
-                            : session.status === 'ANALYZING'
+                            : session.status === 'analyzing'
                               ? 'bg-amber-100'
                               : 'bg-muted/50',
                         )}
@@ -178,7 +178,7 @@ export function SessionsPage() {
                         <StatusIcon
                           className={cn(
                             statusColor,
-                            session.status === 'ANALYZING' && 'animate-spin',
+                            session.status === 'analyzing' && 'animate-spin',
                           )}
                           size={24}
                         />
@@ -188,10 +188,10 @@ export function SessionsPage() {
                           {session.title}
                         </h3>
                         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                          <span className="capitalize">{session.type.toLowerCase()}</span>
+                          <span className="capitalize">{session.sessionType.toLowerCase()}</span>
                           <span>{formatDate(session.createdAt)}</span>
-                          {session.durationSeconds && (
-                            <span>{formatDuration(session.durationSeconds)}</span>
+                          {session.mediaFile?.durationSeconds && (
+                            <span>{formatDuration(session.mediaFile.durationSeconds)}</span>
                           )}
                           <span className={statusColor}>{statusLabel}</span>
                         </div>
