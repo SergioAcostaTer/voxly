@@ -11,7 +11,7 @@ import {
   Timer,
   Video,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { api, ApiClientError } from '../lib/api'
@@ -21,6 +21,8 @@ import type { Session } from '../types/sessions'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Logo } from '../ui/Logo'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 const severityColors = {
   info: 'bg-blue-100 text-blue-700 border-blue-200',
@@ -32,6 +34,7 @@ export function SessionDetailPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
   const { accessToken, logout } = useAuth()
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   const [session, setSession] = useState<Session | null>(null)
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null)
@@ -48,12 +51,12 @@ export function SessionDetailPage() {
       const sessionData = await api.getSession(accessToken, sessionId)
       setSession(sessionData)
 
-      if (sessionData.evaluationId || sessionData.status === 'COMPLETED' || sessionData.status === 'ANALYZING') {
+      if (sessionData.evaluationId || sessionData.status === 'completed' || sessionData.status === 'analyzing') {
         try {
           const evalData = await api.getEvaluation(accessToken, sessionId)
           setEvaluation(evalData)
 
-          if (evalData.status === 'COMPLETED') {
+          if (evalData.status === 'completed') {
             const feedbackData = await api.getFeedback(accessToken, sessionId)
             setFeedback(feedbackData)
           }
@@ -84,7 +87,7 @@ export function SessionDetailPage() {
 
   // Auto-refresh while analyzing
   useEffect(() => {
-    if (session?.status === 'ANALYZING' || evaluation?.status === 'TRANSCRIBING' || evaluation?.status === 'ANALYZING') {
+    if (session?.status === 'analyzing' || evaluation?.status === 'transcribing' || evaluation?.status === 'analyzing') {
       const interval = setInterval(fetchData, 5000)
       return () => clearInterval(interval)
     }
@@ -93,6 +96,13 @@ export function SessionDetailPage() {
   function handleRefresh() {
     setIsRefreshing(true)
     fetchData()
+  }
+
+  function seekToTimestamp(seconds: number) {
+    if (videoRef.current) {
+      videoRef.current.currentTime = seconds
+      videoRef.current.play()
+    }
   }
 
   function formatTimestamp(seconds: number) {
@@ -141,7 +151,8 @@ export function SessionDetailPage() {
     )
   }
 
-  const isAnalyzing = session.status === 'ANALYZING' || evaluation?.status === 'TRANSCRIBING' || evaluation?.status === 'ANALYZING'
+  const isAnalyzing = session.status === 'analyzing' || evaluation?.status === 'transcribing' || evaluation?.status === 'analyzing'
+  const videoUrl = session.mediaFile ? `${API_BASE_URL}${session.mediaFile.url}` : null
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 lg:py-12">
@@ -170,7 +181,7 @@ export function SessionDetailPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="display-font text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground/80">
-                {session.type.toLowerCase()} session
+                {session.sessionType.toLowerCase()} session
               </p>
               <h1 className="display-font mt-2 text-2xl font-semibold sm:text-3xl">
                 {session.title}
@@ -186,7 +197,7 @@ export function SessionDetailPage() {
                   Analyzing...
                 </span>
               )}
-              {session.status === 'COMPLETED' && (
+              {session.status === 'completed' && (
                 <span className="flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-sm">
                   <CheckCircle size={14} />
                   Completed
@@ -210,7 +221,7 @@ export function SessionDetailPage() {
             <div className="py-8 text-center">
               <Loader2 className="mx-auto mb-4 animate-spin text-primary" size={48} />
               <h2 className="display-font text-lg font-semibold text-foreground">
-                {evaluation?.status === 'TRANSCRIBING' ? 'Transcribing audio...' : 'Analyzing your presentation...'}
+                {evaluation?.status === 'transcribing' ? 'Transcribing audio...' : 'Analyzing your presentation...'}
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 We're processing your recording. This page will update automatically.
@@ -219,8 +230,35 @@ export function SessionDetailPage() {
           </Card>
         )}
 
+        {/* Video Player */}
+        {videoUrl && (
+          <Card>
+            <h2 className="display-font mb-4 text-lg font-semibold text-foreground">
+              <Video className="mr-2 inline-block" size={20} />
+              Recording
+            </h2>
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              controls
+              className="w-full rounded-xl bg-black"
+              preload="metadata"
+            >
+              Your browser does not support video playback.
+            </video>
+            {session.mediaFile && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {session.mediaFile.originalFileName}
+                {session.mediaFile.durationSeconds && (
+                  <> &middot; {formatTimestamp(session.mediaFile.durationSeconds)}</>
+                )}
+              </p>
+            )}
+          </Card>
+        )}
+
         {/* Metrics */}
-        {evaluation?.status === 'COMPLETED' && evaluation.metrics && (
+        {evaluation?.status === 'completed' && evaluation.metrics && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
               <div className="flex items-center gap-3">
@@ -287,8 +325,13 @@ export function SessionDetailPage() {
               Transcription
             </h2>
             <div className="max-h-64 overflow-y-auto rounded-xl bg-muted/30 p-4 text-sm leading-relaxed text-foreground">
-              {evaluation.transcription}
+              {evaluation.transcription.fullText}
             </div>
+            {evaluation.transcription.detectedLanguage && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Detected language: {evaluation.transcription.detectedLanguage}
+              </p>
+            )}
           </Card>
         )}
 
@@ -348,10 +391,14 @@ export function SessionDetailPage() {
                       </div>
                       <p className="text-sm">{note.message}</p>
                     </div>
-                    {note.timestampSeconds && (
-                      <span className="shrink-0 font-mono text-sm">
+                    {note.timestampSeconds != null && (
+                      <button
+                        onClick={() => seekToTimestamp(note.timestampSeconds!)}
+                        className="shrink-0 font-mono text-sm underline decoration-dotted hover:opacity-70"
+                        title="Jump to timestamp in video"
+                      >
                         {formatTimestamp(note.timestampSeconds)}
-                      </span>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -367,26 +414,39 @@ export function SessionDetailPage() {
               Overall Summary
             </h2>
             <p className="text-muted-foreground">{feedback.overallSummary}</p>
-          </Card>
-        )}
 
-        {/* Media Placeholder */}
-        {session.mediaPath && (
-          <Card>
-            <h2 className="display-font mb-4 text-lg font-semibold text-foreground">
-              <Video className="mr-2 inline-block" size={20} />
-              Recording
-            </h2>
-            <div className="flex aspect-video items-center justify-center rounded-xl bg-muted/50">
-              <p className="text-sm text-muted-foreground">
-                Video playback coming soon
-              </p>
-            </div>
+            {feedback.strengths.length > 0 && (
+              <div className="mt-4">
+                <h3 className="mb-2 text-sm font-semibold text-green-700">Strengths</h3>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {feedback.strengths.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <CheckCircle className="mt-0.5 shrink-0 text-green-500" size={14} />
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {feedback.areasForImprovement.length > 0 && (
+              <div className="mt-4">
+                <h3 className="mb-2 text-sm font-semibold text-amber-700">Areas for Improvement</h3>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {feedback.areasForImprovement.map((a, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <AlertCircle className="mt-0.5 shrink-0 text-amber-500" size={14} />
+                      {a}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </Card>
         )}
 
         {/* Error State */}
-        {session.status === 'FAILED' && (
+        {session.status === 'failed' && (
           <Card className="border-red-200 bg-red-50">
             <div className="flex items-start gap-3">
               <AlertCircle className="mt-0.5 shrink-0 text-red-500" size={20} />
