@@ -107,6 +107,7 @@ export function SessionDetailPage() {
   const mediaRef = useRef<HTMLMediaElement>(null)
   const transcriptContainerRef = useRef<HTMLDivElement>(null)
   const previousTimeRef = useRef(0)
+  const isSeekingRef = useRef(false)
 
   const [session, setSession] = useState<Session | null>(null)
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null)
@@ -253,7 +254,6 @@ export function SessionDetailPage() {
       mediaRef.current.currentTime = seconds
       previousTimeRef.current = seconds
       setCurrentTime(seconds)
-      void mediaRef.current.play()
     }
   }
 
@@ -328,7 +328,7 @@ export function SessionDetailPage() {
     const time = mediaRef.current.currentTime
     setCurrentTime(time)
 
-    if (!guidedModeEnabled || activeCoachNote) {
+    if (!guidedModeEnabled || activeCoachNote || isSeekingRef.current || !isPlaying) {
       previousTimeRef.current = time
       return
     }
@@ -343,6 +343,7 @@ export function SessionDetailPage() {
       mediaRef.current.pause()
       setIsPlaying(false)
       setActiveCoachNote(upcomingNote)
+      setSelectedFeedbackNote(upcomingNote)
       setDismissedNotes((prev) => {
         const next = new Set(prev)
         next.add(upcomingNote.timestampSeconds)
@@ -355,6 +356,7 @@ export function SessionDetailPage() {
 
   function handleSeeked() {
     if (!mediaRef.current) return
+    isSeekingRef.current = false
     const time = mediaRef.current.currentTime
     setCurrentTime(time)
 
@@ -373,6 +375,10 @@ export function SessionDetailPage() {
     setIsPlaying(false)
   }
 
+  function handleSeeking() {
+    isSeekingRef.current = true
+  }
+
   function startGuidedReview() {
     if (!mediaRef.current) {
       return
@@ -386,6 +392,7 @@ export function SessionDetailPage() {
 
   function continueGuidedReview() {
     setActiveCoachNote(null)
+    setSelectedFeedbackNote(null)
     void mediaRef.current?.play()
   }
 
@@ -397,6 +404,7 @@ export function SessionDetailPage() {
     mediaRef.current.currentTime = Math.max(0, mediaRef.current.currentTime - 5)
     previousTimeRef.current = mediaRef.current.currentTime
     setActiveCoachNote(null)
+    setSelectedFeedbackNote(null)
     void mediaRef.current.play()
   }
 
@@ -413,6 +421,7 @@ export function SessionDetailPage() {
     mediaRef.current.currentTime = Math.max(0, nextMoment.timestampSeconds - 0.2)
     previousTimeRef.current = mediaRef.current.currentTime
     setActiveCoachNote(null)
+    setSelectedFeedbackNote(null)
     void mediaRef.current.play()
   }
 
@@ -653,6 +662,7 @@ export function SessionDetailPage() {
                     preload="metadata"
                     onLoadedMetadata={() => setMediaDuration(mediaRef.current?.duration ?? null)}
                     onTimeUpdate={handleTimeUpdate}
+                    onSeeking={handleSeeking}
                     onSeeked={handleSeeked}
                     onPlay={handlePlay}
                     onPause={handlePause}
@@ -670,6 +680,7 @@ export function SessionDetailPage() {
                     preload="metadata"
                     onLoadedMetadata={() => setMediaDuration(mediaRef.current?.duration ?? null)}
                     onTimeUpdate={handleTimeUpdate}
+                    onSeeking={handleSeeking}
                     onSeeked={handleSeeked}
                     onPlay={handlePlay}
                     onPause={handlePause}
