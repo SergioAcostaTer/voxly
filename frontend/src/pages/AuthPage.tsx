@@ -63,7 +63,7 @@ export function AuthPage({ mode }: AuthPageProps) {
       setError(
         submitError instanceof Error
           ? submitError.message
-          : 'Unable to complete authentication request.',
+          : 'We could not sign you in right now. Please try again.',
       )
     } finally {
       setIsSubmitting(false)

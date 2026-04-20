@@ -46,7 +46,7 @@ export class AppErrorBoundary extends Component<Props, State> {
               <div className="flex-1">
                 <h1 className="display-font text-2xl font-semibold text-red-900">Something broke</h1>
                 <p className="mt-2 text-sm text-red-800">
-                  The app hit an unexpected error, but your work is safe on the server. Reloading should restore the last known state.
+                  Something unexpected happened. Reloading usually fixes it, and your progress is still saved.
                 </p>
                 {this.state.error && (
                   <p className="mt-4 rounded-xl bg-white/80 p-3 text-xs text-red-700">

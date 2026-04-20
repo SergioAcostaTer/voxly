@@ -67,7 +67,7 @@ function getProcessingState(session: Session, evaluation: Evaluation | null): Pr
   if (evaluation?.status === 'analyzing' || session.status === 'analyzing') {
     return {
       label: 'Analyzing presentation',
-      description: 'The transcript is ready and the analysis engine is generating feedback.',
+      description: 'Your results are being prepared now.',
       spinner: true,
       tone: 'accent',
     }
@@ -76,7 +76,7 @@ function getProcessingState(session: Session, evaluation: Evaluation | null): Pr
   if (evaluation?.status === 'pending' || session.status === 'uploaded') {
     return {
       label: 'Queued for processing',
-      description: 'The session is uploaded and waiting for the async pipeline to pick it up.',
+      description: 'Your recording is uploaded and will start shortly.',
       spinner: true,
       tone: 'neutral',
     }
@@ -93,7 +93,7 @@ function getProcessingState(session: Session, evaluation: Evaluation | null): Pr
 
   return {
     label: 'Draft session',
-    description: 'Upload media to start the analysis pipeline.',
+    description: 'Upload your recording to get feedback.',
     spinner: false,
     tone: 'neutral',
   }
@@ -149,7 +149,7 @@ export function SessionDetailPage() {
             setFeedback(null)
           } else if (evaluationError instanceof ApiClientError && evaluationError.status === 401) {
             if (AUTH_BYPASS_ENABLED) {
-              setError('Testing mode is active but the backend did not accept the test user request.')
+              setError('We could not verify your access right now. Please try again.')
               return
             }
             await logout()
@@ -166,7 +166,7 @@ export function SessionDetailPage() {
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
         if (AUTH_BYPASS_ENABLED) {
-          setError('Testing mode is active but the backend did not accept the test user request.')
+          setError('We could not verify your access right now. Please try again.')
           return
         }
         await logout()
@@ -484,7 +484,7 @@ export function SessionDetailPage() {
               </p>
               {lastSyncedAt && (
                 <p className="mt-1 text-xs text-primary-foreground/70">
-                  Last synced {lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  Updated {lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
               )}
             </div>
@@ -492,7 +492,7 @@ export function SessionDetailPage() {
               {isLivePolling && (
                 <span className="flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-sm">
                   <Loader2 className="animate-spin" size={14} />
-                  Live sync
+                  Updating
                 </span>
               )}
               {session.status === 'completed' && (
@@ -543,9 +543,9 @@ export function SessionDetailPage() {
                 </div>
               </div>
               <div className="grid gap-2 text-sm text-muted-foreground md:text-right">
-                <span>Session status: {session.status}</span>
-                <span>Evaluation status: {evaluation?.status ?? 'not created yet'}</span>
-                <span>Reload-safe: yes, progress is saved server-side</span>
+                <span>Your progress is saved automatically.</span>
+                <span>You can leave this page and come back anytime.</span>
+                <span>We'll keep this page updated for you.</span>
               </div>
             </div>
 
@@ -553,18 +553,18 @@ export function SessionDetailPage() {
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 <div className="rounded-xl bg-white/70 p-4">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Step 1</p>
-                  <p className="mt-1 font-semibold text-foreground">Upload stored</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Media is saved in S3/R2 and linked to the session.</p>
+                  <p className="mt-1 font-semibold text-foreground">Upload received</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Your recording is safely saved.</p>
                 </div>
                 <div className="rounded-xl bg-white/70 p-4">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Step 2</p>
-                  <p className="mt-1 font-semibold text-foreground">Transcription</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Whisper runs detached; this page keeps syncing status.</p>
+                  <p className="mt-1 font-semibold text-foreground">Transcript in progress</p>
+                  <p className="mt-1 text-sm text-muted-foreground">We're turning your recording into text.</p>
                 </div>
                 <div className="rounded-xl bg-white/70 p-4">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">Step 3</p>
-                  <p className="mt-1 font-semibold text-foreground">Analysis</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Feedback is generated and saved so you can refresh safely.</p>
+                  <p className="mt-1 font-semibold text-foreground">Feedback</p>
+                  <p className="mt-1 text-sm text-muted-foreground">You'll see your coaching notes here as soon as they're ready.</p>
                 </div>
               </div>
             )}
@@ -776,9 +776,9 @@ export function SessionDetailPage() {
             <div className="flex items-start gap-3">
               <Loader2 className={cn('mt-0.5 shrink-0 text-primary', isProcessing && 'animate-spin')} size={18} />
               <div>
-                <h2 className="font-semibold text-foreground">Processing in progress</h2>
+                <h2 className="font-semibold text-foreground">We're working on your feedback</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  You can reload this page at any time. The backend will recover pending work and this view will continue polling until the result is ready.
+                  You can refresh or come back later. Your results will be waiting for you.
                 </p>
               </div>
             </div>

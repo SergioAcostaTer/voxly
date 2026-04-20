@@ -43,7 +43,7 @@ export function SessionsPage() {
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
         if (AUTH_BYPASS_ENABLED) {
-          setError('Testing mode is active but the backend did not accept the test user request.')
+          setError('We could not verify your access right now. Please try again.')
           return
         }
         await logout()

@@ -313,7 +313,7 @@ export function NewSessionPage() {
       setStep('upload')
       if (err instanceof ApiClientError && err.status === 401) {
         if (AUTH_BYPASS_ENABLED) {
-          setError('Testing mode is active but the backend did not accept the test user request.')
+          setError('We could not verify your access right now. Please try again.')
           return
         }
         await logout()
@@ -351,13 +351,13 @@ export function NewSessionPage() {
           <div className="mb-6">
             <h1 className="display-font text-2xl font-semibold text-foreground">
               {step === 'details' && 'New Practice Session'}
-              {step === 'upload' && 'Record or Upload Your Audio'}
-              {step === 'processing' && 'Processing...'}
+              {step === 'upload' && 'Add Your Recording'}
+              {step === 'processing' && 'Almost done...'}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {step === 'details' && 'Set up your practice session details'}
-              {step === 'upload' && 'Record audio in your browser or upload an audio/video file'}
-              {step === 'processing' && 'Uploading and analyzing your recording'}
+              {step === 'upload' && 'Record in your browser or upload an audio/video file'}
+              {step === 'processing' && 'Uploading your recording and preparing your feedback'}
             </p>
           </div>
 
@@ -555,7 +555,7 @@ export function NewSessionPage() {
               <Loader2 className="mx-auto mb-4 animate-spin text-primary" size={48} />
               <p className="font-semibold text-foreground">Processing your presentation</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                This may take a moment...
+                This can take a minute...
               </p>
               <div className="mx-auto mt-6 h-2 w-full max-w-xs overflow-hidden rounded-full bg-muted">
                 <div

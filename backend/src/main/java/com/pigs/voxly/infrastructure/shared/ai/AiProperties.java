@@ -15,6 +15,6 @@ public record AiProperties(
     ) {}
 
     public record OpenAiGptProperties(
-            @DefaultValue("gpt-3.5-turbo") String model
+            @DefaultValue("gpt-4o-mini") String model
     ) {}
 }
