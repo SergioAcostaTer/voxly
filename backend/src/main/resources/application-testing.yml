@@ -1,0 +1,13 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+app:
+  auth:
+    testing-open-access: true
+    dev-bypass-enabled: true
+    dev-email: test@voxly.local
+    dev-username: testuser
+    dev-user-id: 11111111-1111-1111-1111-111111111111
+    dev-password: test123

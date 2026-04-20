@@ -1,6 +1,7 @@
 package com.pigs.voxly.infrastructure.identity.security;
 
 import com.pigs.voxly.application.identity.ports.CurrentUserProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -12,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Component
+@ConditionalOnProperty(name = "app.auth.testing-open-access", havingValue = "false", matchIfMissing = true)
 public class SecurityCurrentUserProvider implements CurrentUserProvider {
 
     @Override

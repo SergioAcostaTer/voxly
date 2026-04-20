@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -20,8 +21,18 @@ import com.pigs.voxly.sharedKernel.domain.results.ResultT;
 
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.ObjectCannedACL;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 @Service
 @ConditionalOnProperty(name = "app.storage.type", havingValue = "s3", matchIfMissing = true)
@@ -29,8 +40,9 @@ public class R2StorageService implements StorageService {
     private static final Logger logger = LoggerFactory.getLogger(R2StorageService.class);
 
     private final S3Client s3Client;
+    private final S3Presigner s3Presigner;
     private final String bucketName;
-    private final String publicUrl;
+    private final Duration presignedUrlDuration;
     private final Path tempDir;
 
     public R2StorageService(
@@ -38,20 +50,28 @@ public class R2StorageService implements StorageService {
             @Value("${cloudflare.r2.accessKeyId}") String accessKeyId,
             @Value("${cloudflare.r2.accessKeySecret}") String accessKeySecret,
             @Value("${cloudflare.r2.bucketName}") String bucketName,
-            @Value("${cloudflare.r2.publicUrl}") String publicUrl,
+            @Value("${cloudflare.r2.region:auto}") String region,
+            @Value("${cloudflare.r2.presigned-url-expiration-seconds:3600}") long presignedUrlExpirationSeconds,
             @Value("${storage.temp-dir:/tmp/voxly-temp}") String tempDirPath) {
 
         this.bucketName = bucketName;
-        this.publicUrl = publicUrl;
+        this.presignedUrlDuration = Duration.ofSeconds(Math.max(1, presignedUrlExpirationSeconds));
         this.tempDir = Path.of(tempDirPath).toAbsolutePath().normalize();
 
         // Initialize S3 client with R2 endpoint
         AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKeyId, accessKeySecret);
+        Region awsRegion = Region.of(region);
 
         this.s3Client = S3Client.builder()
-                .region(Region.US_EAST_1)
                 .endpointOverride(URI.create(endpoint))
                 .credentialsProvider(StaticCredentialsProvider.create(credentials))
+                .region(awsRegion)
+                .build();
+
+        this.s3Presigner = S3Presigner.builder()
+                .endpointOverride(URI.create(endpoint))
+                .credentialsProvider(StaticCredentialsProvider.create(credentials))
+                .region(awsRegion)
                 .build();
 
         try {
@@ -163,10 +183,17 @@ public class R2StorageService implements StorageService {
 
     @Override
     public String getPublicUrl(String storagePath) {
-        if (publicUrl == null || publicUrl.isBlank()) {
-            return "/api/v1/files/" + storagePath;
-        }
-        return publicUrl.endsWith("/") ? (publicUrl + storagePath) : (publicUrl + "/" + storagePath);
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucketName)
+                .key(storagePath)
+                .build();
+
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(presignedUrlDuration)
+                .getObjectRequest(getObjectRequest)
+                .build();
+
+        return s3Presigner.presignGetObject(presignRequest).url().toString();
     }
 
     @Override

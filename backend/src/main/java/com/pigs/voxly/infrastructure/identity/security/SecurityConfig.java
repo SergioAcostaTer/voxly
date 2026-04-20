@@ -5,6 +5,7 @@ import java.util.List;
 
 import javax.crypto.SecretKey;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -29,13 +30,26 @@ import io.jsonwebtoken.security.Keys;
 public class SecurityConfig {
 
     private final JwtProperties jwtProperties;
+    private final boolean testingOpenAccess;
 
-    public SecurityConfig(JwtProperties jwtProperties) {
+    public SecurityConfig(
+            JwtProperties jwtProperties,
+            @Value("${app.auth.testing-open-access:false}") boolean testingOpenAccess) {
         this.jwtProperties = jwtProperties;
+        this.testingOpenAccess = testingOpenAccess;
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        if (testingOpenAccess) {
+            return http
+                    .csrf(csrf -> csrf.disable())
+                    .cors(Customizer.withDefaults())
+                    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                    .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                    .build();
+        }
+
         return http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())

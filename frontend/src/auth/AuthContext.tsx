@@ -9,6 +9,9 @@ import { ApiClientError, api } from '../lib/api'
 import type { LoginPayload, RegisterPayload, User } from '../types/auth'
 import { AuthContext, type AuthContextValue } from './auth-context'
 
+const AUTH_BYPASS_ENABLED = import.meta.env.VITE_AUTH_BYPASS === 'true'
+const TESTING_ACCESS_TOKEN = 'testing-bypass'
+
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<User | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
@@ -30,6 +33,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [])
 
   const syncAccessToken = useCallback(async () => {
+    if (AUTH_BYPASS_ENABLED) {
+      try {
+        const profile = await api.me(TESTING_ACCESS_TOKEN)
+        setAccessToken(TESTING_ACCESS_TOKEN)
+        setUser(profile)
+      } catch {
+        setAccessToken(null)
+        setUser(null)
+      }
+      return
+    }
+
     if (!accessToken) {
       setUser(null)
       return
@@ -46,6 +61,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [accessToken, loadProfileWithRefreshFallback])
 
   const bootstrapSession = useCallback(async () => {
+    if (AUTH_BYPASS_ENABLED) {
+      try {
+        const profile = await api.me(TESTING_ACCESS_TOKEN)
+        setAccessToken(TESTING_ACCESS_TOKEN)
+        setUser(profile)
+      } catch {
+        setAccessToken(null)
+        setUser(null)
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
     try {
       const refreshed = await api.requestAccessToken()
       setAccessToken(refreshed.accessToken)
@@ -65,6 +94,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [bootstrapSession])
 
   const login = useCallback(async (payload: LoginPayload) => {
+    if (AUTH_BYPASS_ENABLED) {
+      const profile = await api.me(TESTING_ACCESS_TOKEN)
+      setAccessToken(TESTING_ACCESS_TOKEN)
+      setUser(profile)
+      return
+    }
+
     const result = await api.login(payload)
 
     if (result.requiresTwoFactor) {
@@ -86,10 +122,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [])
 
   const register = useCallback(async (payload: RegisterPayload) => {
+    if (AUTH_BYPASS_ENABLED) {
+      return
+    }
+
     await api.register(payload)
   }, [])
 
   const logout = useCallback(async () => {
+    if (AUTH_BYPASS_ENABLED) {
+      return
+    }
+
     try {
       await api.logout()
     } finally {

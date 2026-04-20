@@ -2,6 +2,8 @@
 springdotenv:
   directory: .
 
+debug: true
+
 spring:
   application:
     name: VoxLy
@@ -12,29 +14,20 @@ spring:
     banner-mode: console
 
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/voxly}
-    username: ${DATABASE_USERNAME:voxly_user}
-    password: ${DATABASE_PASSWORD:voxly_password}
-    driver-class-name: ${DATABASE_DRIVER:org.postgresql.Driver}
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: ${DATABASE_DRIVER}
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     open-in-view: false
     show-sql: true
     properties:
       hibernate:
         format_sql: true
-
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
-    baseline-version: 4
-    baseline-description: legacy-hibernate-schema
-    clean-disabled: false
-    clean-on-validation-error: true
 
   servlet:
     multipart:
@@ -42,10 +35,10 @@ spring:
       max-request-size: 100MB
 
   mail:
-    host: ${SMTP_HOST:localhost}
-    port: ${SMTP_PORT:1025}
-    username: ${SMTP_USERNAME:}
-    password: ${SMTP_PASSWORD:}
+    host: ${SMTP_HOST}
+    port: ${SMTP_PORT}
+    username: ${SMTP_USERNAME}
+    password: ${SMTP_PASSWORD}
     properties:
       mail:
         smtp:
@@ -55,15 +48,15 @@ spring:
 
 cloudflare:
   r2:
-    endpoint: ${CLOUDFLARE_R2_ENDPOINT:http://localhost:9000}
+    endpoint: ${CLOUDFLARE_R2_ENDPOINT}
     region: ${CLOUDFLARE_R2_REGION:auto}
-    accessKeyId: ${CLOUDFLARE_R2_ACCESS_KEY_ID:}
-    accessKeySecret: ${CLOUDFLARE_R2_ACCESS_KEY_SECRET:}
+    accessKeyId: ${CLOUDFLARE_R2_ACCESS_KEY_ID}
+    accessKeySecret: ${CLOUDFLARE_R2_ACCESS_KEY_SECRET}
     bucketName: ${CLOUDFLARE_R2_BUCKET_NAME:voxly-sessions}
-    publicUrl: ${CLOUDFLARE_R2_PUBLIC_URL:http://localhost:8080/uploads}
+    publicUrl: ${CLOUDFLARE_R2_PUBLIC_URL}
 
 openai:
-  apiKey: ${OPENAI_API_KEY:}
+  apiKey: ${OPENAI_API_KEY}
   whisper:
     model: ${OPENAI_WHISPER_MODEL:whisper-1}
     supportedLanguages: ${OPENAI_SUPPORTED_LANGUAGES:en,es}
@@ -88,7 +81,7 @@ notification:
   email:
     from: ${SMTP_FROM_EMAIL:noreply@voxly.app}
     admin: ${ADMIN_EMAIL:admin@voxly.app}
-  base-url: ${APP_BASE_URL:http://localhost:3000}
+  base-url: ${APP_BASE_URL}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -99,7 +92,7 @@ springdoc:
 
 app:
   jwt:
-    secret-key: ${JWT_SECRET_KEY:ZTQ5ZGU2MjctYzc5My00NjMwLTk3MTEtMzRkMGQyMjUyMzJkLXZveGx5LWRldi1rZXk}
+    secret-key: ${JWT_SECRET_KEY}
     issuer: ${JWT_ISSUER:VoxLy}
     audience: ${JWT_AUDIENCE:VoxLy}
     access-token-expiry-minutes: ${JWT_ACCESS_TOKEN_EXPIRY_MINUTES:15}
@@ -108,11 +101,14 @@ app:
   auth:
     dev-bypass-enabled: ${AUTH_DEV_BYPASS_ENABLED:false}
     dev-email: ${AUTH_DEV_EMAIL:}
+    dev-username: ${AUTH_DEV_USERNAME:testuser}
+    dev-user-id: ${AUTH_DEV_USER_ID:11111111-1111-1111-1111-111111111111}
     dev-password: ${AUTH_DEV_PASSWORD:}
+    testing-open-access: ${AUTH_TESTING_OPEN_ACCESS:false}
   mail:
     from-email: ${SMTP_FROM_EMAIL:noreply@voxly.com}
     from-name: ${APP_NAME:VoxLy}
-    base-url: ${APP_BASE_URL:http://localhost:3000}
+    base-url: ${APP_BASE_URL}
   storage:
     type: ${STORAGE_TYPE:s3}
     base-url: ${STORAGE_BASE_URL:/api/v1/files}

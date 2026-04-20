@@ -29,7 +29,7 @@ Transform your presentation skills with intelligent speech analysis, transcripti
 **Backend**
 - Java 21 with Spring Boot 4.0.3
 - PostgreSQL (Neon) for data persistence
-- Flyway for database migrations
+- Hibernate/JPA auto schema update (`ddl-auto=update`)
 - OpenAI API (Whisper + GPT-3.5-turbo) for AI capabilities
 - Cloudflare R2 for secure file storage
 - JWT for authentication
@@ -54,7 +54,7 @@ voxly/
 │   ├── src/main/resources/
 │   │   ├── application.yml    # Configuration (dev)
 │   │   ├── application-prod.yml # Configuration (prod)
-│   │   └── db/migration/      # Database migrations
+│   │   └── application-testing.yml # No-login testing profile
 │   └── build.gradle           # Dependencies & build config
 │
 ├── frontend/                   # React + TypeScript SPA
@@ -82,7 +82,7 @@ voxly/
 
 - **Java 21+** (with Maven or Gradle)
 - **Node.js 18+** and npm
-- **PostgreSQL 14+** (or use Neon cloud DB)
+- **Docker** and Docker Compose plugin for local infrastructure
 - **FFmpeg** (for audio extraction from videos)
 
 ### 1️⃣ Clone & Setup Environment
@@ -99,7 +99,31 @@ cp .env.example .env
 # See next section for required credentials
 ```
 
-### 2️⃣ Configure Secrets & Credentials
+### 2️⃣ Start Local Infrastructure
+
+The repo includes one local infrastructure compose file at `backend/docker-compose.yml`.
+
+It starts:
+- PostgreSQL on `localhost:55432`
+- MinIO API on `localhost:19100`
+- MinIO console on `localhost:19101`
+- Mailpit SMTP on `localhost:11025`
+- Mailpit inbox UI on `localhost:18025`
+
+Run it with:
+
+```bash
+make infra-up
+```
+
+Or directly:
+
+```bash
+cd backend
+docker compose up -d
+```
+
+### 3️⃣ Configure Secrets & Credentials
 
 Edit `.env` and fill in these required values:
 
@@ -136,7 +160,9 @@ APP_BASE_URL=http://localhost:3000
 SERVER_PORT=8080
 ```
 
-### 3️⃣ Start Backend (API Server)
+For local development, `backend/.env.example` already matches the compose defaults for Postgres, MinIO, and Mailpit.
+
+### 4️⃣ Start Backend (API Server)
 
 ```bash
 cd backend
@@ -159,7 +185,7 @@ curl http://localhost:8080/actuator/health
 # Should return: {"status":"UP"}
 ```
 
-### 4️⃣ Start Frontend (React App)
+### 5️⃣ Start Frontend (React App)
 
 ```bash
 cd frontend
@@ -178,7 +204,7 @@ npm run dev
 - Login/Register forms
 - Beautiful Tailwind UI
 
-### 5️⃣ Test the MVP Flow
+### 6️⃣ Test the MVP Flow
 
 1. **Create Account**: Go to http://localhost:5173 → Register
 2. **Login**: Use your credentials
@@ -221,19 +247,15 @@ Recommended policy:
 2. Only override model values if quality is clearly insufficient.
 3. Upgrade analysis model first; keep transcription model unchanged unless needed.
 
-### Database Migrations
+### Database Schema
 
-Migrations run automatically on startup. Track them in:
-```
-backend/src/main/resources/db/migration/
-```
+The backend now relies on Hibernate/JPA schema auto-update at startup:
 
-Current migrations:
-- `V1__Create_Core_Schema.sql` - Users, sessions, transcriptions
-- `V2__Add_Storage_Fields.sql` - File storage metadata
-- `V3__Create_Transcriptions_Table.sql` - Transcription data
-- `V4__Create_Analyses_Table.sql` - Analysis results
-- `V5__Add_Language_Support.sql` - Multi-language support
+- `spring.jpa.hibernate.ddl-auto=update`
+
+For a frictionless local testing workflow without login, run backend with:
+
+- `--spring.profiles.active=testing`
 
 ### Storage Options
 
@@ -245,6 +267,18 @@ CLOUDFLARE_R2_ACCESS_KEY_SECRET=...
 ```
 
 VoxLy now runs in **S3/R2-only mode** by default to keep behavior consistent across environments.
+
+**Local Development**
+```env
+STORAGE_TYPE=s3
+CLOUDFLARE_R2_ENDPOINT=http://localhost:19100
+CLOUDFLARE_R2_REGION=us-east-1
+CLOUDFLARE_R2_ACCESS_KEY_ID=voxlyminio
+CLOUDFLARE_R2_ACCESS_KEY_SECRET=voxlyminiosecret
+CLOUDFLARE_R2_BUCKET_NAME=voxly-sessions
+```
+
+MinIO is only there to emulate the S3-compatible storage contract locally. `ffmpeg` should still live on the machine or inside the backend runtime image, not as a standalone service.
 
 ### Logging
 
@@ -470,9 +504,17 @@ npm run build
 # Creates: frontend/dist/
 ```
 
-### Docker Deployment (Optional)
+### Local Docker Infrastructure
 
-See `backend/docker-compose.yml` for containerized setup.
+The compose file is intended for local dependencies only:
+
+```bash
+make infra-up
+make infra-logs
+make infra-down
+```
+
+Keep the backend/frontend running normally outside containers unless you specifically want a containerized app workflow.
 
 ---
 

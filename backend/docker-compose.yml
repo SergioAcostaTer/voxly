@@ -1,25 +1,57 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:16-alpine
     container_name: voxly-postgres
-    ports:
-      - "5433:5432"
+    restart: unless-stopped
     environment:
       POSTGRES_DB: voxly
-      POSTGRES_USER: voxly
-      POSTGRES_PASSWORD: voxly
+      POSTGRES_USER: voxly_user
+      POSTGRES_PASSWORD: voxly_password
+    ports:
+      - "55432:5432"
     volumes:
-      - voxly-pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voxly_user -d voxly"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:RELEASE.2026-03-27T16-37-53Z
+    container_name: voxly-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: voxlyminio
+      MINIO_ROOT_PASSWORD: voxlyminiosecret
+    ports:
+      - "19100:9000"
+      - "19101:9001"
+    volumes:
+      - minio_data:/data
+
+  minio-setup:
+    image: minio/mc:RELEASE.2026-03-12T17-29-24Z
+    container_name: voxly-minio-setup
+    depends_on:
+      - minio
+    restart: "no"
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 voxlyminio voxlyminiosecret; do sleep 2; done &&
+      mc mb --ignore-existing local/voxly-sessions &&
+      mc anonymous set private local/voxly-sessions
+      "
 
   mailpit:
-    image: axllent/mailpit
+    image: axllent/mailpit:v1.26
     container_name: voxly-mailpit
+    restart: unless-stopped
     ports:
-      - "1025:1025"   # SMTP
-      - "8025:8025"   # Web UI
-    environment:
-      MP_SMTP_AUTH_ACCEPT_ANY: 1
-      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+      - "11025:1025"
+      - "18025:8025"
 
 volumes:
-  voxly-pgdata:
+  postgres_data:
+  minio_data:
