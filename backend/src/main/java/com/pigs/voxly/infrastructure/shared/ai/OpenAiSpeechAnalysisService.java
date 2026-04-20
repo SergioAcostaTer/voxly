@@ -138,60 +138,47 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
             String sessionType,
             Metrics metrics) {
         String transcriptPayload = buildTranscriptPayload(transcription);
-        return String.format(
-                """
-                        Analyze this %s transcription and provide feedback.
-
-                        **Metrics:**
-                        - Words per minute: %d
-                        - Total words: %d
-                        - Filler words: %d
-                        - Pauses: %d
-                        - Duration: %.1f minutes
-
-                        **Transcription:**
-                        %s
-
-                        **Output requirements:**
-                        - You are writing for Guided Coach Mode. Each note should read like a conversational coaching intervention.
-                        - Keep tone friendly, first-person, and professional.
-                        - Provide 6 to 8 total notes when the speech has enough material.
-                        - Include at least 4 timestamped notes whenever the transcript has clear moments to point to.
-                        - Cluster nearby issues into a single feedback note when they happen within 8 seconds.
-                        - Prefer precise timestamps with 0.1-second resolution when possible.
-                        - Make each note specific and actionable. Avoid vague advice.
-                        - Use endTimestampSeconds only when a note spans a longer section.
-                        - Keep strengths and improvement bullets concrete and non-overlapping.
-                        - Use the timing data below to anchor feedback to the exact word or segment where the issue happens.
-
-                        **Transcript timing data:**
-                        %s
-
-                        Respond in this exact JSON format:
-                        {
-                          "overallSummary": "2-3 sentence summary of the performance",
-                          "strengths": ["strength 1", "strength 2", "strength 3"],
-                          "areasForImprovement": ["improvement 1", "improvement 2", "improvement 3"],
-                          "feedbackNotes": [
-                            {
-                                                    "category": "pacing|filler|clarity|structure",
-                                                    "severity": "info|warning|critical",
-                                                    "timestampSeconds": 14.5,
-                                                    "endTimestampSeconds": 18.2,
-                                                    "title": "Short coaching title",
-                                                    "message": "specific actionable feedback tied to this exact moment",
-                                                    "coachScript": "First-person conversational coach explanation."
-                            }
-                          ]
-                        }
-                        """,
-                sessionType,
-                metrics.wordsPerMinute(),
-                metrics.totalWords(),
-                metrics.fillerWordCount(),
-                metrics.pauseCount(),
-                metrics.durationMinutes(),
-                transcriptPayload);
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("Analyze this ").append(sessionType).append(" transcription and provide feedback.\n\n");
+        prompt.append("**Metrics:**\n");
+        prompt.append("- Words per minute: ").append(metrics.wordsPerMinute()).append('\n');
+        prompt.append("- Total words: ").append(metrics.totalWords()).append('\n');
+        prompt.append("- Filler words: ").append(metrics.fillerWordCount()).append('\n');
+        prompt.append("- Pauses: ").append(metrics.pauseCount()).append('\n');
+        prompt.append("- Duration: ").append(String.format(Locale.ROOT, "%.1f", metrics.durationMinutes())).append(" minutes\n\n");
+        prompt.append("**Transcription:**\n");
+        prompt.append(transcription.fullText()).append("\n\n");
+        prompt.append("**Output requirements:**\n");
+        prompt.append("- You are writing for Guided Coach Mode. Each note should read like a conversational coaching intervention.\n");
+        prompt.append("- Keep tone friendly, first-person, and professional.\n");
+        prompt.append("- Provide 6 to 8 total notes when the speech has enough material.\n");
+        prompt.append("- Include at least 4 timestamped notes whenever the transcript has clear moments to point to.\n");
+        prompt.append("- Cluster nearby issues into a single feedback note when they happen within 8 seconds.\n");
+        prompt.append("- Prefer precise timestamps with 0.1-second resolution when possible.\n");
+        prompt.append("- Make each note specific and actionable. Avoid vague advice.\n");
+        prompt.append("- Use endTimestampSeconds only when a note spans a longer section.\n");
+        prompt.append("- Keep strengths and improvement bullets concrete and non-overlapping.\n");
+        prompt.append("- Use the timing data below to anchor feedback to the exact word or segment where the issue happens.\n\n");
+        prompt.append("**Transcript timing data:**\n");
+        prompt.append(transcriptPayload).append("\n\n");
+        prompt.append("Respond in this exact JSON format:\n");
+        prompt.append("{\n");
+        prompt.append("  \"overallSummary\": \"2-3 sentence summary of the performance\",\n");
+        prompt.append("  \"strengths\": [\"strength 1\", \"strength 2\", \"strength 3\"],\n");
+        prompt.append("  \"areasForImprovement\": [\"improvement 1\", \"improvement 2\", \"improvement 3\"],\n");
+        prompt.append("  \"feedbackNotes\": [\n");
+        prompt.append("    {\n");
+        prompt.append("      \"category\": \"pacing|filler|clarity|structure\",\n");
+        prompt.append("      \"severity\": \"info|warning|critical\",\n");
+        prompt.append("      \"timestampSeconds\": 14.5,\n");
+        prompt.append("      \"endTimestampSeconds\": 18.2,\n");
+        prompt.append("      \"title\": \"Short coaching title\",\n");
+        prompt.append("      \"message\": \"specific actionable feedback tied to this exact moment\",\n");
+        prompt.append("      \"coachScript\": \"First-person conversational coach explanation.\"\n");
+        prompt.append("    }\n");
+        prompt.append("  ]\n");
+        prompt.append("}\n");
+        return prompt.toString();
     }
 
     private GptFeedback parseGptResponse(String content) throws JsonProcessingException {
