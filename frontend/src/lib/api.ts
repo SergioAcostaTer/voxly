@@ -43,6 +43,36 @@ type SessionEventCallback = (event: { event: string; data: unknown }) => void
 
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504])
 
+function normalizeMediaUploadFile(file: File): File {
+  const extension = file.name.toLowerCase().split('.').pop() ?? ''
+  const currentType = file.type.toLowerCase()
+
+  let normalizedType = currentType
+
+  if (extension === 'm4a') {
+    normalizedType = 'audio/mp4'
+  } else if (extension === 'mp3') {
+    normalizedType = 'audio/mpeg'
+  } else if (extension === 'wav') {
+    normalizedType = 'audio/wav'
+  } else if (extension === 'ogg') {
+    normalizedType = 'audio/ogg'
+  } else if (extension === 'webm') {
+    normalizedType = currentType.startsWith('video/') ? 'video/webm' : 'audio/webm'
+  } else if (extension === 'mp4' && (currentType === '' || currentType === 'application/octet-stream')) {
+    normalizedType = 'video/mp4'
+  }
+
+  if (normalizedType === currentType || normalizedType === '') {
+    return file
+  }
+
+  return new File([file], file.name, {
+    type: normalizedType,
+    lastModified: file.lastModified,
+  })
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -190,6 +220,7 @@ export const api = {
     onProgress?: UploadProgressCallback,
   ) {
     return new Promise<Session>((resolve, reject) => {
+      const normalizedFile = normalizeMediaUploadFile(file)
       const formData = new FormData()
       formData.append('title', data.title)
       formData.append('sessionType', data.sessionType)
@@ -197,7 +228,7 @@ export const api = {
       if (data.description) {
         formData.append('description', data.description)
       }
-      formData.append('file', file)
+      formData.append('file', normalizedFile)
 
       const xhr = new XMLHttpRequest()
       xhr.open('POST', `${API_BASE_URL}/v1/sessions/with-media`)
@@ -243,116 +274,6 @@ export const api = {
     })
   },
 
-  createRecordingUpload(accessToken: string, fileName: string, contentType: string) {
-    const params = new URLSearchParams({ fileName, contentType })
-    return request<{ uploadId: string; sizeBytes: number; nextSequence: number; completed: boolean; modifiedAt: string }>(
-      `/v1/sessions/recording-uploads?${params.toString()}`,
-      {
-        method: 'POST',
-        accessToken,
-      },
-    )
-  },
-
-  appendRecordingChunk(
-    accessToken: string,
-    uploadId: string,
-    sequence: number,
-    chunk: Blob,
-    isLastChunk = false,
-  ) {
-    return new Promise<{ uploadId: string; sizeBytes: number; nextSequence: number; completed: boolean; modifiedAt: string }>((resolve, reject) => {
-      const formData = new FormData()
-      formData.append('chunk', chunk, `chunk-${sequence}.webm`)
-
-      const xhr = new XMLHttpRequest()
-      xhr.open('POST', `${API_BASE_URL}/v1/sessions/recording-uploads/${uploadId}/chunks?sequence=${sequence}&isLastChunk=${isLastChunk}`)
-      xhr.withCredentials = true
-      xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
-
-      xhr.onerror = () => reject(new ApiClientError('Chunk upload failed due to a network error.', 0))
-      xhr.onload = () => {
-        const status = xhr.status
-        const payload = (() => {
-          try {
-            return JSON.parse(xhr.responseText || 'null') as ApiResponse<{ uploadId: string; sizeBytes: number; nextSequence: number; completed: boolean; modifiedAt: string }> | null
-          } catch {
-            return null
-          }
-        })()
-        const firstError = payload?.errors?.[0]
-
-        if (status < 200 || status >= 300 || !payload?.success) {
-          reject(new ApiClientError(
-            firstError?.message ?? `Chunk upload failed with status ${status}`,
-            status,
-            firstError?.code,
-          ))
-          return
-        }
-
-        resolve(payload.data as { uploadId: string; sizeBytes: number; nextSequence: number; completed: boolean; modifiedAt: string })
-      }
-
-      xhr.send(formData)
-    })
-  },
-
-  createSessionWithRecordingUpload(
-    accessToken: string,
-    data: CreateSessionRequest,
-    uploadId: string,
-  ) {
-    const formData = new FormData()
-    formData.append('title', data.title)
-    formData.append('sessionType', data.sessionType)
-    formData.append('language', data.language)
-    if (data.description) {
-      formData.append('description', data.description)
-    }
-    formData.append('uploadId', uploadId)
-
-    return new Promise<Session>((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      xhr.open('POST', `${API_BASE_URL}/v1/sessions/with-recording-upload`)
-      xhr.withCredentials = true
-      xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
-
-      xhr.onerror = () => reject(new ApiClientError('Recording upload finalization failed due to a network error.', 0))
-      xhr.onload = () => {
-        const status = xhr.status
-        const payload = (() => {
-          try {
-            return JSON.parse(xhr.responseText || 'null') as ApiResponse<Session> | null
-          } catch {
-            return null
-          }
-        })()
-        const firstError = payload?.errors?.[0]
-
-        if (status < 200 || status >= 300 || !payload?.success) {
-          reject(new ApiClientError(
-            firstError?.message ?? `Recording finalization failed with status ${status}`,
-            status,
-            firstError?.code,
-          ))
-          return
-        }
-
-        resolve(payload.data as Session)
-      }
-
-      xhr.send(formData)
-    })
-  },
-
-  deleteRecordingUpload(accessToken: string, uploadId: string) {
-    return request<void>(`/v1/sessions/recording-uploads/${uploadId}`, {
-      method: 'DELETE',
-      accessToken,
-    })
-  },
-
   deleteSession(accessToken: string, sessionId: string) {
     return request<void>(`/v1/sessions/${sessionId}`, {
       method: 'DELETE',
@@ -367,8 +288,9 @@ export const api = {
     onProgress?: UploadProgressCallback,
   ) {
     return new Promise<Session>((resolve, reject) => {
+      const normalizedFile = normalizeMediaUploadFile(file)
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('file', normalizedFile)
 
       const xhr = new XMLHttpRequest()
       xhr.open('POST', `${API_BASE_URL}/v1/sessions/${sessionId}/media`)

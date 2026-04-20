@@ -1,18 +1,21 @@
 package com.pigs.voxly.infrastructure.identity.persistence.repository;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.pigs.voxly.domain.identity.User;
 import com.pigs.voxly.domain.identity.UserId;
 import com.pigs.voxly.domain.identity.UserRepository;
 import com.pigs.voxly.domain.identity.valueobjects.Email;
 import com.pigs.voxly.domain.identity.valueobjects.Username;
 import com.pigs.voxly.infrastructure.identity.persistence.mapper.UserPersistenceMapper;
-import org.springframework.stereotype.Repository;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 @Repository
+@Transactional(readOnly = true)
 public class JpaUserRepository implements UserRepository {
 
     private final SpringDataUserRepository springDataRepo;
@@ -76,11 +79,13 @@ public class JpaUserRepository implements UserRepository {
     }
 
     @Override
+    @Transactional
     public void save(User user) {
         springDataRepo.save(mapper.toJpa(user));
     }
 
     @Override
+    @Transactional
     public void delete(User user) {
         springDataRepo.deleteById(user.getId().getValue());
     }

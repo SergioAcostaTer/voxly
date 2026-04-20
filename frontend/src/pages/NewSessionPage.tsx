@@ -24,16 +24,87 @@ const LANGUAGES: { value: SupportedLanguage; label: string }[] = [
 ]
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
-const SUPPORTED_UPLOAD_TYPES = ['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4']
 const RECORDING_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
 
 function getRecordedFileExtension(mimeType: string) {
   const normalizedMimeType = mimeType.toLowerCase()
+  if (normalizedMimeType.includes('wav')) return 'wav'
   if (normalizedMimeType.includes('webm')) return 'webm'
   if (mimeType.includes('mp4')) return 'm4a'
   if (mimeType.includes('mpeg')) return 'mp3'
   if (mimeType.includes('ogg')) return 'ogg'
   return 'webm'
+}
+
+function isSupportedUploadType(fileType: string) {
+  return fileType.startsWith('audio/') || fileType.startsWith('video/')
+}
+
+function audioBufferToWavBlob(audioBuffer: AudioBuffer) {
+  const channels = audioBuffer.numberOfChannels
+  const sampleRate = audioBuffer.sampleRate
+  const samples = audioBuffer.length
+  const bitsPerSample = 16
+  const bytesPerSample = bitsPerSample / 8
+  const blockAlign = channels * bytesPerSample
+  const byteRate = sampleRate * blockAlign
+  const dataSize = samples * blockAlign
+
+  const buffer = new ArrayBuffer(44 + dataSize)
+  const view = new DataView(buffer)
+
+  const writeString = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i++) {
+      view.setUint8(offset + i, value.charCodeAt(i))
+    }
+  }
+
+  writeString(0, 'RIFF')
+  view.setUint32(4, 36 + dataSize, true)
+  writeString(8, 'WAVE')
+  writeString(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, channels, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, byteRate, true)
+  view.setUint16(32, blockAlign, true)
+  view.setUint16(34, bitsPerSample, true)
+  writeString(36, 'data')
+  view.setUint32(40, dataSize, true)
+
+  let offset = 44
+  for (let i = 0; i < samples; i++) {
+    for (let channel = 0; channel < channels; channel++) {
+      const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[i]))
+      const pcm = sample < 0 ? sample * 0x8000 : sample * 0x7fff
+      view.setInt16(offset, pcm, true)
+      offset += 2
+    }
+  }
+
+  return new Blob([buffer], { type: 'audio/wav' })
+}
+
+async function toPlayableRecordingFile(recordedBlob: Blob) {
+  try {
+    const audioContext = new AudioContext()
+    const arrayBuffer = await recordedBlob.arrayBuffer()
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+    const wavBlob = audioBufferToWavBlob(audioBuffer)
+    await audioContext.close()
+    return {
+      blob: wavBlob,
+      mimeType: 'audio/wav',
+      extension: 'wav',
+    }
+  } catch {
+    return {
+      blob: recordedBlob,
+      mimeType: recordedBlob.type || 'audio/webm',
+      extension: getRecordedFileExtension(recordedBlob.type || 'audio/webm'),
+    }
+  }
 }
 
 export function NewSessionPage() {
@@ -47,10 +118,6 @@ export function NewSessionPage() {
   const [dragActive, setDragActive] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingPreviewUrl, setRecordingPreviewUrl] = useState<string | null>(null)
-  const [recordingUploadId, setRecordingUploadId] = useState<string | null>(null)
-  const [recordingUploadName, setRecordingUploadName] = useState<string | null>(null)
-  const [recordingUploadedBytes, setRecordingUploadedBytes] = useState(0)
-  const [recordingReady, setRecordingReady] = useState(false)
 
   const [step, setStep] = useState<'details' | 'upload' | 'processing'>('details')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -59,8 +126,6 @@ export function NewSessionPage() {
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordingChunksRef = useRef<BlobPart[]>([])
-  const chunkUploadChainRef = useRef<Promise<void>>(Promise.resolve())
-  const nextChunkSequenceRef = useRef(0)
 
   useEffect(() => {
     return () => {
@@ -70,23 +135,6 @@ export function NewSessionPage() {
       }
     }
   }, [recordingPreviewUrl])
-
-  const clearRecordingUpload = useCallback(async () => {
-    if (recordingUploadId && accessToken) {
-      try {
-        await api.deleteRecordingUpload(accessToken, recordingUploadId)
-      } catch {
-        // Best-effort temp file cleanup.
-      }
-    }
-
-    setRecordingUploadId(null)
-    setRecordingUploadName(null)
-    setRecordingUploadedBytes(0)
-    setRecordingReady(false)
-    chunkUploadChainRef.current = Promise.resolve()
-    nextChunkSequenceRef.current = 0
-  }, [accessToken, recordingUploadId])
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -104,13 +152,12 @@ export function NewSessionPage() {
     setDragActive(false)
 
     const droppedFile = e.dataTransfer.files[0]
-    if (droppedFile && SUPPORTED_UPLOAD_TYPES.includes(droppedFile.type)) {
+    if (droppedFile && isSupportedUploadType(droppedFile.type)) {
       if (droppedFile.size > MAX_FILE_SIZE) {
         setError('File size must be under 100MB')
         return
       }
       setFile(droppedFile)
-      void clearRecordingUpload()
       if (recordingPreviewUrl) {
         URL.revokeObjectURL(recordingPreviewUrl)
         setRecordingPreviewUrl(null)
@@ -119,12 +166,12 @@ export function NewSessionPage() {
     } else {
       setError('Please upload an audio or video file')
     }
-  }, [clearRecordingUpload, recordingPreviewUrl])
+  }, [recordingPreviewUrl])
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
-      if (!SUPPORTED_UPLOAD_TYPES.includes(selectedFile.type)) {
+      if (!isSupportedUploadType(selectedFile.type)) {
         setError('Please upload an audio or video file')
         return
       }
@@ -133,23 +180,24 @@ export function NewSessionPage() {
         return
       }
       setFile(selectedFile)
-      void clearRecordingUpload()
       if (recordingPreviewUrl) {
         URL.revokeObjectURL(recordingPreviewUrl)
         setRecordingPreviewUrl(null)
       }
       setError(null)
     }
-  }, [clearRecordingUpload, recordingPreviewUrl])
+  }, [recordingPreviewUrl])
 
   const stopRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== 'inactive') {
+      try {
+        recorder.requestData()
+      } catch {
+        // Some browsers may throw if requestData isn't available in current state.
+      }
       recorder.stop()
     }
-
-    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
-    mediaStreamRef.current = null
     setIsRecording(false)
   }, [])
 
@@ -159,14 +207,9 @@ export function NewSessionPage() {
         setError('Audio recording is not supported in this browser.')
         return
       }
-      if (!accessToken) {
-        setError('You must be authenticated to start recording.')
-        return
-      }
 
       setError(null)
       setFile(null)
-      await clearRecordingUpload()
       if (recordingPreviewUrl) {
         URL.revokeObjectURL(recordingPreviewUrl)
         setRecordingPreviewUrl(null)
@@ -178,62 +221,57 @@ export function NewSessionPage() {
       const mimeType = RECORDING_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type))
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
       const effectiveMimeType = recorder.mimeType || mimeType || 'audio/webm'
-      const extension = getRecordedFileExtension(effectiveMimeType)
-      const fileName = `voxly-audio-recording-${Date.now()}.${extension}`
-      const upload = await api.createRecordingUpload(accessToken, fileName, effectiveMimeType)
-
       recordingChunksRef.current = []
-      chunkUploadChainRef.current = Promise.resolve()
-      nextChunkSequenceRef.current = 0
-      setRecordingUploadId(upload.uploadId)
-      setRecordingUploadName(fileName)
-      setRecordingUploadedBytes(0)
-      setRecordingReady(false)
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          const sequence = nextChunkSequenceRef.current++
-          chunkUploadChainRef.current = chunkUploadChainRef.current.then(async () => {
-            const response = await api.appendRecordingChunk(accessToken, upload.uploadId, sequence, event.data, false)
-            setRecordingUploadedBytes(response.sizeBytes)
-          }).catch((uploadError) => {
-            setError(uploadError instanceof Error ? uploadError.message : 'Failed to upload a recording chunk')
-            stopRecording()
-          })
+          recordingChunksRef.current.push(event.data)
         }
       }
 
       recorder.onstop = () => {
-        void chunkUploadChainRef.current
-          .then(() => api.appendRecordingChunk(
-            accessToken,
-            upload.uploadId,
-            nextChunkSequenceRef.current,
-            new Blob([], { type: effectiveMimeType }),
-            true,
-          ))
-          .then((response) => {
-            setRecordingUploadedBytes(response.sizeBytes)
-            setRecordingReady(true)
-            setRecordingPreviewUrl(null)
-            setFile(null)
-            setError(null)
+        mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+        mediaStreamRef.current = null
+
+        void (async () => {
+          const recordedBlob = new Blob(recordingChunksRef.current, { type: effectiveMimeType })
+
+          // Finalize immediately with the raw recording so UI never blocks on conversion.
+          const rawExtension = getRecordedFileExtension(effectiveMimeType)
+          const rawFileName = `voxly-audio-recording-${Date.now()}.${rawExtension}`
+          const rawFile = new File([recordedBlob], rawFileName, { type: effectiveMimeType })
+          const rawPreviewUrl = URL.createObjectURL(recordedBlob)
+          setFile(rawFile)
+          setRecordingPreviewUrl(rawPreviewUrl)
+          setError(null)
+
+          const playable = await toPlayableRecordingFile(recordedBlob)
+          if (playable.mimeType === rawFile.type && playable.extension === rawExtension) {
+            return
+          }
+
+          const convertedFileName = `voxly-audio-recording-${Date.now()}.${playable.extension}`
+          const convertedFile = new File([playable.blob], convertedFileName, { type: playable.mimeType })
+          const convertedPreviewUrl = URL.createObjectURL(playable.blob)
+          setFile(convertedFile)
+          setRecordingPreviewUrl((previousUrl) => {
+            if (previousUrl) {
+              URL.revokeObjectURL(previousUrl)
+            }
+            return convertedPreviewUrl
           })
-          .catch((uploadError) => {
-            setError(uploadError instanceof Error ? uploadError.message : 'Unable to finalize recording upload')
-          })
+        })()
       }
 
       mediaRecorderRef.current = recorder
-      recorder.start(1000)
+      recorder.start()
       setIsRecording(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to start audio recording')
-      await clearRecordingUpload()
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
       mediaStreamRef.current = null
       setIsRecording(false)
     }
-  }, [accessToken, clearRecordingUpload, recordingPreviewUrl, stopRecording])
+  }, [recordingPreviewUrl])
 
   const toggleRecording = useCallback(() => {
     if (isRecording) {
@@ -252,7 +290,7 @@ export function NewSessionPage() {
   }
 
   async function handleUpload() {
-    if (!accessToken || !title.trim() || (!file && !recordingReady)) return
+    if (!accessToken || !title.trim() || !file) return
 
     setIsSubmitting(true)
     setError(null)
@@ -260,18 +298,12 @@ export function NewSessionPage() {
     setUploadProgress(0)
 
     try {
-      const session = file
-        ? await api.createSessionWithMedia(
-            accessToken,
-            { title: title.trim(), sessionType: type, language },
-            file,
-            setUploadProgress,
-          )
-        : await api.createSessionWithRecordingUpload(
-            accessToken,
-            { title: title.trim(), sessionType: type, language },
-            recordingUploadId!,
-          )
+      const session = await api.createSessionWithMedia(
+        accessToken,
+        { title: title.trim(), sessionType: type, language },
+        file,
+        setUploadProgress,
+      )
       setUploadProgress(100)
 
       await api.requestAnalysis(accessToken, session.id)
@@ -425,7 +457,6 @@ export function NewSessionPage() {
                   onClick={() => {
                     stopRecording()
                     setFile(null)
-                    void clearRecordingUpload()
                     if (recordingPreviewUrl) {
                       URL.revokeObjectURL(recordingPreviewUrl)
                       setRecordingPreviewUrl(null)
@@ -445,20 +476,13 @@ export function NewSessionPage() {
                     <p className="text-sm font-medium text-foreground">Recorded audio ready</p>
                     <audio controls src={recordingPreviewUrl} className="w-full" />
                     <p className="text-xs text-muted-foreground">{file.name} · {formatFileSize(file.size)}</p>
-                  </div>
-                </Card>
-              )}
-
-              {recordingReady && recordingUploadName && (
-                <Card className="border-primary/20 bg-primary/5">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-foreground">Recorded audio uploaded</p>
-                    <p className="text-xs text-muted-foreground">
-                      {recordingUploadName} · {formatFileSize(recordingUploadedBytes)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Chunks were streamed during recording, so the browser does not need to hold one giant final blob.
-                    </p>
+                    <a
+                      href={recordingPreviewUrl}
+                      download={file.name}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Download recording
+                    </a>
                   </div>
                 </Card>
               )}
@@ -467,7 +491,7 @@ export function NewSessionPage() {
                 className={`relative rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
                   dragActive
                     ? 'border-primary bg-primary/5'
-                    : (file || recordingReady)
+                    : file
                       ? 'border-green-400 bg-green-50'
                       : 'border-border hover:border-primary/50'
                 }`}
@@ -483,7 +507,7 @@ export function NewSessionPage() {
                   className="absolute inset-0 cursor-pointer opacity-0"
                 />
                 <Upload
-                  className={`mx-auto mb-4 ${(file || recordingReady) ? 'text-green-500' : 'text-muted-foreground'}`}
+                  className={`mx-auto mb-4 ${file ? 'text-green-500' : 'text-muted-foreground'}`}
                   size={40}
                 />
                 {file ? (
@@ -500,20 +524,6 @@ export function NewSessionPage() {
                       Choose different file
                     </button>
                   </div>
-                ) : recordingReady && recordingUploadName ? (
-                  <div>
-                    <p className="font-semibold text-foreground">{recordingUploadName}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {formatFileSize(recordingUploadedBytes)}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => void clearRecordingUpload()}
-                      className="mt-2 text-sm text-primary hover:underline"
-                    >
-                      Record again
-                    </button>
-                  </div>
                 ) : (
                   <div>
                     <p className="font-semibold text-foreground">Drag and drop your audio here</p>
@@ -524,7 +534,7 @@ export function NewSessionPage() {
                 )}
               </div>
 
-              <Button onClick={handleUpload} className="w-full" disabled={(!file && !recordingReady) || isSubmitting}>
+              <Button onClick={handleUpload} className="w-full" disabled={!file || isSubmitting}>
                 {isSubmitting ? (
                   <>
                     <Loader2 className="animate-spin" size={18} />

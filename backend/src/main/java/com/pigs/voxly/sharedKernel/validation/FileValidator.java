@@ -17,11 +17,15 @@ public final class FileValidator {
 
     private static final Set<String> ALLOWED_VIDEO_TYPES = Set.of(
             "video/mp4",
-            "video/webm");
+            "video/webm",
+            "video/quicktime",
+            "video/x-msvideo");
 
     private static final Set<String> ALLOWED_VIDEO_EXTENSIONS = Set.of(
             ".mp4",
-            ".webm");
+            ".webm",
+            ".mov",
+            ".avi");
 
     private static final Set<String> ALLOWED_AUDIO_TYPES = Set.of(
             "audio/webm",
@@ -29,7 +33,12 @@ public final class FileValidator {
             "audio/mpeg",
             "audio/wav",
             "audio/x-wav",
-            "audio/ogg");
+            "audio/ogg",
+            "audio/m4a",
+            "audio/x-m4a",
+            "audio/mp4a-latm",
+            "audio/wave",
+            "audio/aac");
 
     private static final Set<String> ALLOWED_AUDIO_EXTENSIONS = Set.of(
             ".webm",
@@ -38,7 +47,8 @@ public final class FileValidator {
             ".mp4",
             ".mp3",
             ".wav",
-            ".ogg");
+            ".ogg",
+            ".aac");
 
     private static final Set<String> ALLOWED_DOCUMENT_TYPES = Set.of(
             "application/pdf",
@@ -261,6 +271,19 @@ public final class FileValidator {
             normalized = normalized.substring(0, separatorIndex).trim();
         }
 
-        return normalized.isBlank() ? null : normalized;
+        if (normalized.isBlank()) {
+            return null;
+        }
+
+        // Normalize common browser/device aliases to canonical types.
+        if ("audio/x-m4a".equals(normalized) || "audio/m4a".equals(normalized)
+                || "audio/mp4a-latm".equals(normalized)) {
+            return "audio/mp4";
+        }
+        if ("audio/wave".equals(normalized)) {
+            return "audio/wav";
+        }
+
+        return normalized;
     }
 }
