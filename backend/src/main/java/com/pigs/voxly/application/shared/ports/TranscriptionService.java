@@ -26,8 +26,10 @@ public interface TranscriptionService {
     record TranscriptionResult(
             String fullText,
             List<Segment> segments,
+            List<Word> words,
             String detectedLanguage,
-            double durationSeconds
+            double durationSeconds,
+            String rawJson
     ) {}
 
     /**
@@ -35,6 +37,16 @@ public interface TranscriptionService {
      */
     record Segment(
             String text,
+            double startSeconds,
+            double endSeconds,
+            double confidence
+    ) {}
+
+    /**
+     * Represents a word-level timestamp.
+     */
+    record Word(
+            String word,
             double startSeconds,
             double endSeconds,
             double confidence

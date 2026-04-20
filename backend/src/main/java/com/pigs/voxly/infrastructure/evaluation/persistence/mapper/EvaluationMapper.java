@@ -20,6 +20,8 @@ public class EvaluationMapper {
                 entity.getSessionType(),
                 entity.getTranscriptionText(),
                 entity.getTranscriptionJson(),
+                entity.getTranscriptionWordsJson(),
+                entity.getTranscriptionRawJson(),
                 entity.getDurationSeconds(),
                 entity.getDetectedLanguage(),
                 entity.getWordsPerMinute(),
@@ -48,6 +50,8 @@ public class EvaluationMapper {
         entity.setSessionType(evaluation.getSessionType());
         entity.setTranscriptionText(evaluation.getTranscriptionText());
         entity.setTranscriptionJson(evaluation.getTranscriptionJson());
+        entity.setTranscriptionWordsJson(evaluation.getTranscriptionWordsJson());
+        entity.setTranscriptionRawJson(evaluation.getTranscriptionRawJson());
         entity.setDurationSeconds(evaluation.getDurationSeconds());
         entity.setDetectedLanguage(evaluation.getDetectedLanguage());
         entity.setWordsPerMinute(evaluation.getWordsPerMinute());

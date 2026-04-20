@@ -13,6 +13,7 @@ import {
     SkipForward,
     Timer,
     Video,
+    X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -120,6 +121,7 @@ export function SessionDetailPage() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [guidedModeEnabled, setGuidedModeEnabled] = useState(false)
   const [activeCoachNote, setActiveCoachNote] = useState<FeedbackNote | null>(null)
+  const [selectedFeedbackNote, setSelectedFeedbackNote] = useState<FeedbackNote | null>(null)
   const [dismissedNotes, setDismissedNotes] = useState<Set<number>>(new Set())
   const [mediaDuration, setMediaDuration] = useState<number | null>(null)
   const streamAbortRef = useRef<AbortController | null>(null)
@@ -250,8 +252,26 @@ export function SessionDetailPage() {
     if (mediaRef.current) {
       mediaRef.current.currentTime = seconds
       previousTimeRef.current = seconds
+      setCurrentTime(seconds)
       void mediaRef.current.play()
     }
+  }
+
+  function openFeedbackNote(note: FeedbackNote) {
+    if (note.timestampSeconds != null) {
+      if (mediaRef.current) {
+        mediaRef.current.currentTime = note.timestampSeconds
+        previousTimeRef.current = note.timestampSeconds
+        setCurrentTime(note.timestampSeconds)
+      }
+    }
+    mediaRef.current?.pause()
+    setIsPlaying(false)
+    setSelectedFeedbackNote(note)
+  }
+
+  function closeFeedbackNote() {
+    setSelectedFeedbackNote(null)
   }
 
   function normalizeSeverity(severity: string | null | undefined) {
@@ -692,6 +712,14 @@ export function SessionDetailPage() {
                           <Button onClick={continueGuidedReview}>
                             Got it, continue ▶
                           </Button>
+
+                          <Button
+                            variant="ghost"
+                            className="border border-white/20 bg-white/5 text-white hover:bg-white/15"
+                            onClick={() => openFeedbackNote(activeCoachNote)}
+                          >
+                            Open note details
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -708,7 +736,7 @@ export function SessionDetailPage() {
                       return (
                         <button
                           key={`${note.timestampSeconds}-${index}`}
-                          onClick={() => seekToTimestamp(note.timestampSeconds)}
+                          onClick={() => openFeedbackNote(note)}
                           className={cn(
                             'absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white',
                             isActive ? 'bg-primary shadow-glow' : 'bg-cyan-500/90',
@@ -904,24 +932,37 @@ export function SessionDetailPage() {
               {filteredNotes.map((note, index) => (
                 <div
                   key={index}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openFeedbackNote(note)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      openFeedbackNote(note)
+                    }
+                  }}
                   className={cn(
-                    'rounded-xl border p-4',
+                    'cursor-pointer rounded-xl border p-4 transition-transform hover:-translate-y-0.5 hover:shadow-md',
                     severityColors[normalizeSeverity(note.severity) as keyof typeof severityColors] || 'bg-gray-100 text-gray-700 border-gray-200',
                   )}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="mb-1 flex items-center gap-2">
-                        <span className="font-semibold capitalize">{note.category}</span>
+                        <span className="font-semibold capitalize">{note.title ?? note.category}</span>
                         <span className="rounded bg-black/10 px-2 py-0.5 text-xs font-medium">
                           {note.severity}
                         </span>
                       </div>
-                      <p className="text-sm">{note.message}</p>
+                      <p className="text-xs uppercase tracking-wide opacity-70">{note.category}</p>
+                      <p className="mt-1 text-sm">{note.message}</p>
                     </div>
                     {note.timestampSeconds != null && (
                       <button
-                        onClick={() => seekToTimestamp(note.timestampSeconds!)}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          openFeedbackNote(note)
+                        }}
                         className="shrink-0 font-mono text-sm underline decoration-dotted hover:opacity-70"
                         title="Jump to timestamp in video"
                       >
@@ -933,6 +974,78 @@ export function SessionDetailPage() {
               ))}
             </div>
           </Card>
+        )}
+
+        {selectedFeedbackNote && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+            onClick={closeFeedbackNote}
+          >
+            <div
+              className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {selectedFeedbackNote.category}
+                  </p>
+                  <h3 className="mt-1 text-2xl font-semibold text-foreground">
+                    {selectedFeedbackNote.title ?? 'Feedback detail'}
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Severity: <span className="font-medium text-foreground">{selectedFeedbackNote.severity}</span>
+                  </p>
+                  {selectedFeedbackNote.timestampSeconds != null && (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Timestamp: <span className="font-medium text-foreground">{formatTimestamp(selectedFeedbackNote.timestampSeconds)}</span>
+                      {selectedFeedbackNote.endTimestampSeconds != null && (
+                        <> to <span className="font-medium text-foreground">{formatTimestamp(selectedFeedbackNote.endTimestampSeconds)}</span></>
+                      )}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={closeFeedbackNote}
+                  className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label="Close feedback detail"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="mt-5 rounded-2xl bg-muted/35 p-4">
+                <p className="text-sm font-semibold text-foreground">What this means</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {selectedFeedbackNote.message}
+                </p>
+              </div>
+
+              {selectedFeedbackNote.coachScript && (
+                <div className="mt-4 rounded-2xl border border-primary/10 bg-primary/5 p-4">
+                  <p className="text-sm font-semibold text-foreground">Coach script</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {selectedFeedbackNote.coachScript}
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-6 flex flex-wrap gap-2">
+                {selectedFeedbackNote.timestampSeconds != null && (
+                  <Button
+                    onClick={() => {
+                      seekToTimestamp(selectedFeedbackNote.timestampSeconds!)
+                    }}
+                  >
+                    Jump to this moment
+                  </Button>
+                )}
+                <Button variant="secondary" onClick={closeFeedbackNote}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Overall Summary */}

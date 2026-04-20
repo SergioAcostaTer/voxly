@@ -20,6 +20,8 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
     // Transcription data
     private String transcriptionText;
     private String transcriptionJson; // Full segments JSON
+    private String transcriptionWordsJson; // Full word-level timestamps JSON
+    private String transcriptionRawJson; // Raw transcription payload JSON
     private Double durationSeconds;
     private String detectedLanguage;
 
@@ -72,6 +74,8 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
             String sessionType,
             String transcriptionText,
             String transcriptionJson,
+            String transcriptionWordsJson,
+            String transcriptionRawJson,
             Double durationSeconds,
             String detectedLanguage,
             Integer wordsPerMinute,
@@ -97,6 +101,8 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
         evaluation.sessionType = sessionType;
         evaluation.transcriptionText = transcriptionText;
         evaluation.transcriptionJson = transcriptionJson;
+        evaluation.transcriptionWordsJson = transcriptionWordsJson;
+        evaluation.transcriptionRawJson = transcriptionRawJson;
         evaluation.durationSeconds = durationSeconds;
         evaluation.detectedLanguage = detectedLanguage;
         evaluation.wordsPerMinute = wordsPerMinute;
@@ -130,11 +136,15 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
     public Result completeTranscription(
             String fullText,
             String segmentsJson,
+            String wordsJson,
+            String rawJson,
             double durationSeconds,
             String detectedLanguage
     ) {
         this.transcriptionText = fullText;
         this.transcriptionJson = segmentsJson;
+        this.transcriptionWordsJson = wordsJson;
+        this.transcriptionRawJson = rawJson;
         this.durationSeconds = durationSeconds;
         this.detectedLanguage = detectedLanguage;
         this.status = EvaluationStatus.ANALYZING;
@@ -219,6 +229,14 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
 
     public String getTranscriptionJson() {
         return transcriptionJson;
+    }
+
+    public String getTranscriptionWordsJson() {
+        return transcriptionWordsJson;
+    }
+
+    public String getTranscriptionRawJson() {
+        return transcriptionRawJson;
     }
 
     public Double getDurationSeconds() {

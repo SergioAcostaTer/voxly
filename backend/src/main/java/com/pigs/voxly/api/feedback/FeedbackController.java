@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pigs.voxly.api.shared.ApiResponse;
+import com.pigs.voxly.application.evaluation.dto.EvaluationResponse;
 import com.pigs.voxly.application.evaluation.EvaluationService;
 import com.pigs.voxly.application.shared.ports.SpeechAnalysisService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,22 +54,7 @@ public class FeedbackController {
         }
 
         try {
-            List<SpeechAnalysisService.FeedbackNote> notes = objectMapper.readValue(
-                    evaluation.feedback().notesJson(),
-                    new TypeReference<>() {}
-            );
-
-            List<String> strengths = evaluation.metrics() != null ?
-                    parseJsonList(evaluation.feedback().overallSummary()) : Collections.emptyList();
-
-            return ResponseEntity.ok(ApiResponse.ok(new FeedbackResponse(
-                    sessionId,
-                    evaluation.id(),
-                    notes,
-                    evaluation.feedback().overallSummary(),
-                    Collections.emptyList(), // Will be populated from evaluation
-                    Collections.emptyList()
-            )));
+            return ResponseEntity.ok(ApiResponse.ok(buildResponse(sessionId, evaluation)));
 
         } catch (JsonProcessingException e) {
             return ResponseEntity.ok(ApiResponse.ok(new FeedbackResponse(
@@ -80,6 +66,21 @@ public class FeedbackController {
                     Collections.emptyList()
             )));
         }
+    }
+
+    private FeedbackResponse buildResponse(UUID sessionId, EvaluationResponse evaluation) throws JsonProcessingException {
+        List<SpeechAnalysisService.FeedbackNote> notes = parseNotes(evaluation.feedback().notesJson());
+        List<String> strengths = parseJsonList(evaluation.feedback().strengthsJson());
+        List<String> areasForImprovement = parseJsonList(evaluation.feedback().areasForImprovementJson());
+
+        return new FeedbackResponse(
+                sessionId,
+                evaluation.id(),
+                notes,
+                evaluation.feedback().overallSummary(),
+                strengths,
+                areasForImprovement
+        );
     }
 
     @GetMapping("/session/{sessionId}/category/{category}")
@@ -124,6 +125,13 @@ public class FeedbackController {
         } catch (JsonProcessingException e) {
             return Collections.emptyList();
         }
+    }
+
+    private List<SpeechAnalysisService.FeedbackNote> parseNotes(String json) throws JsonProcessingException {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyList();
+        }
+        return objectMapper.readValue(json, new TypeReference<>() {});
     }
 
     public record FeedbackResponse(

@@ -6,11 +6,20 @@ export type SegmentData = {
   endSeconds: number
 }
 
+export type WordData = {
+  word: string
+  startSeconds: number
+  endSeconds: number
+  confidence: number
+}
+
 export type TranscriptionData = {
   fullText: string
   segments: SegmentData[]
+  words: WordData[]
   durationSeconds: number | null
   detectedLanguage: string | null
+  rawJson: string | null
 }
 
 export type EvaluationMetrics = {
@@ -24,6 +33,8 @@ export type EvaluationMetrics = {
 export type FeedbackData = {
   overallSummary: string | null
   notesJson: string | null
+  strengthsJson: string | null
+  areasForImprovementJson: string | null
 }
 
 export type Evaluation = {

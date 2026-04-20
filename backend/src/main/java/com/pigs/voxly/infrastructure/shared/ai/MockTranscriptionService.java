@@ -102,8 +102,10 @@ public class MockTranscriptionService implements TranscriptionService {
         TranscriptionResult result = new TranscriptionResult(
                 fullText,
                 segments,
+                List.of(),
                 language != null ? language : "en",
-                68.0
+                68.0,
+                null
         );
 
         log.info("Mock transcription completed: {} segments, {} seconds duration",

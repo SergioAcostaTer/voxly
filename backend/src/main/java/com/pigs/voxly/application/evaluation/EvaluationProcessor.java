@@ -20,6 +20,8 @@ import com.pigs.voxly.application.shared.ports.TranscriptionService;
 import com.pigs.voxly.domain.evaluation.EvaluationId;
 import com.pigs.voxly.domain.evaluation.EvaluationRepository;
 import com.pigs.voxly.domain.sessions.SessionRepository;
+import com.pigs.voxly.application.shared.ports.TranscriptionService.Segment;
+import com.pigs.voxly.application.shared.ports.TranscriptionService.Word;
 
 @Service
 public class EvaluationProcessor {
@@ -108,10 +110,12 @@ public class EvaluationProcessor {
                     && evaluation.getTranscriptionText() != null) {
                 transcription = new com.pigs.voxly.application.shared.ports.TranscriptionService.TranscriptionResult(
                         evaluation.getTranscriptionText(),
-                        List.of(),
+                        parseSegmentsJson(evaluation.getTranscriptionJson()),
+                        parseWordsJson(evaluation.getTranscriptionWordsJson()),
                         evaluation.getDetectedLanguage() != null ? evaluation.getDetectedLanguage()
                                 : session.getLanguage(),
-                        evaluation.getDurationSeconds() != null ? evaluation.getDurationSeconds() : 0.0);
+                        evaluation.getDurationSeconds() != null ? evaluation.getDurationSeconds() : 0.0,
+                        evaluation.getTranscriptionRawJson());
             } else {
                 log.info("Starting transcription for evaluation: {}", evaluationId);
                 var startResult = evaluation.startTranscription();
@@ -135,9 +139,12 @@ public class EvaluationProcessor {
 
                 try {
                     String segmentsJson = objectMapper.writeValueAsString(transcription.segments());
+                    String wordsJson = objectMapper.writeValueAsString(transcription.words());
                     evaluation.completeTranscription(
                             transcription.fullText(),
                             segmentsJson,
+                            wordsJson,
+                            transcription.rawJson(),
                             transcription.durationSeconds(),
                             transcription.detectedLanguage());
                     evaluationRepository.save(evaluation);
@@ -212,5 +219,31 @@ public class EvaluationProcessor {
             }
         }
         log.error("Evaluation failed: {} - {}", evaluationId, errorMessage);
+    }
+
+    private List<Segment> parseSegmentsJson(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            return objectMapper.readValue(json, objectMapper.getTypeFactory().constructCollectionType(List.class, Segment.class));
+        } catch (Exception e) {
+            log.warn("Failed to parse stored transcript segments JSON", e);
+            return List.of();
+        }
+    }
+
+    private List<Word> parseWordsJson(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            return objectMapper.readValue(json, objectMapper.getTypeFactory().constructCollectionType(List.class, Word.class));
+        } catch (Exception e) {
+            log.warn("Failed to parse stored transcript words JSON", e);
+            return List.of();
+        }
     }
 }

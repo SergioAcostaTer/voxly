@@ -29,8 +29,10 @@ public record EvaluationResponse(
             transcription = new TranscriptionData(
                     evaluation.getTranscriptionText(),
                     parseSegments(evaluation.getTranscriptionJson()),
+                    parseWords(evaluation.getTranscriptionWordsJson()),
                     evaluation.getDurationSeconds(),
-                    evaluation.getDetectedLanguage());
+                    evaluation.getDetectedLanguage(),
+                    evaluation.getTranscriptionRawJson());
         }
 
         MetricsData metrics = null;
@@ -47,7 +49,9 @@ public record EvaluationResponse(
         if (evaluation.getOverallSummary() != null) {
             feedback = new FeedbackData(
                     evaluation.getOverallSummary(),
-                    evaluation.getFeedbackJson());
+                    evaluation.getFeedbackJson(),
+                    evaluation.getStrengthsJson(),
+                    evaluation.getImprovementsJson());
         }
 
         return new EvaluationResponse(
@@ -85,17 +89,49 @@ public record EvaluationResponse(
         }
     }
 
+    private static List<WordData> parseWords(String transcriptionWordsJson) {
+        if (transcriptionWordsJson == null || transcriptionWordsJson.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        try {
+            List<TranscriptionService.Word> words = OBJECT_MAPPER.readValue(
+                    transcriptionWordsJson,
+                    new TypeReference<>() {
+                    });
+
+            return words.stream()
+                    .map(word -> new WordData(
+                            word.word(),
+                            word.startSeconds(),
+                            word.endSeconds(),
+                            word.confidence()))
+                    .toList();
+        } catch (Exception ignored) {
+            return Collections.emptyList();
+        }
+    }
+
     public record TranscriptionData(
             String fullText,
             List<SegmentData> segments,
+            List<WordData> words,
             Double durationSeconds,
-            String detectedLanguage) {
+            String detectedLanguage,
+            String rawJson) {
     }
 
     public record SegmentData(
             String text,
             double startSeconds,
             double endSeconds) {
+    }
+
+    public record WordData(
+            String word,
+            double startSeconds,
+            double endSeconds,
+            double confidence) {
     }
 
     public record MetricsData(
@@ -108,6 +144,8 @@ public record EvaluationResponse(
 
     public record FeedbackData(
             String overallSummary,
-            String notesJson) {
+            String notesJson,
+            String strengthsJson,
+            String areasForImprovementJson) {
     }
 }

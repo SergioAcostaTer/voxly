@@ -30,6 +30,12 @@ public class EvaluationJpaEntity {
     @Column(name = "transcription_json", columnDefinition = "TEXT")
     private String transcriptionJson;
 
+    @Column(name = "transcription_words_json", columnDefinition = "TEXT")
+    private String transcriptionWordsJson;
+
+    @Column(name = "transcription_raw_json", columnDefinition = "TEXT")
+    private String transcriptionRawJson;
+
     @Column(name = "duration_seconds")
     private Double durationSeconds;
 
@@ -101,6 +107,12 @@ public class EvaluationJpaEntity {
 
     public String getTranscriptionJson() { return transcriptionJson; }
     public void setTranscriptionJson(String transcriptionJson) { this.transcriptionJson = transcriptionJson; }
+
+    public String getTranscriptionWordsJson() { return transcriptionWordsJson; }
+    public void setTranscriptionWordsJson(String transcriptionWordsJson) { this.transcriptionWordsJson = transcriptionWordsJson; }
+
+    public String getTranscriptionRawJson() { return transcriptionRawJson; }
+    public void setTranscriptionRawJson(String transcriptionRawJson) { this.transcriptionRawJson = transcriptionRawJson; }
 
     public Double getDurationSeconds() { return durationSeconds; }
     public void setDurationSeconds(Double durationSeconds) { this.durationSeconds = durationSeconds; }
