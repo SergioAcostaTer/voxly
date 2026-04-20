@@ -125,7 +125,9 @@ export function SessionDetailPage() {
   const [selectedFeedbackNote, setSelectedFeedbackNote] = useState<FeedbackNote | null>(null)
   const [dismissedNotes, setDismissedNotes] = useState<Set<number>>(new Set())
   const [mediaDuration, setMediaDuration] = useState<number | null>(null)
+  const [isMediaReady, setIsMediaReady] = useState(false)
   const streamAbortRef = useRef<AbortController | null>(null)
+  const pendingSeekRef = useRef<number | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!accessToken || !sessionId) return
@@ -250,20 +252,23 @@ export function SessionDetailPage() {
   }
 
   function seekToTimestamp(seconds: number) {
-    if (mediaRef.current) {
+    pendingSeekRef.current = seconds
+    setCurrentTime(seconds)
+
+    if (!mediaRef.current) {
+      return
+    }
+
+    if (isMediaReady || mediaRef.current.readyState >= HTMLMediaElement.HAVE_METADATA) {
       mediaRef.current.currentTime = seconds
       previousTimeRef.current = seconds
-      setCurrentTime(seconds)
+      pendingSeekRef.current = null
     }
   }
 
   function openFeedbackNote(note: FeedbackNote) {
     if (note.timestampSeconds != null) {
-      if (mediaRef.current) {
-        mediaRef.current.currentTime = note.timestampSeconds
-        previousTimeRef.current = note.timestampSeconds
-        setCurrentTime(note.timestampSeconds)
-      }
+      seekToTimestamp(note.timestampSeconds)
     }
     mediaRef.current?.pause()
     setIsPlaying(false)
@@ -273,6 +278,8 @@ export function SessionDetailPage() {
   function closeFeedbackNote() {
     setSelectedFeedbackNote(null)
   }
+
+  const visibleCoachNote = selectedFeedbackNote ?? activeCoachNote
 
   function normalizeSeverity(severity: string | null | undefined) {
     return severity?.toLowerCase() ?? 'info'
@@ -379,6 +386,24 @@ export function SessionDetailPage() {
     isSeekingRef.current = true
   }
 
+  function applyPendingSeek() {
+    if (!mediaRef.current || pendingSeekRef.current == null) {
+      return
+    }
+
+    const nextSeek = pendingSeekRef.current
+    mediaRef.current.currentTime = nextSeek
+    previousTimeRef.current = nextSeek
+    setCurrentTime(nextSeek)
+    pendingSeekRef.current = null
+  }
+
+  function handleMediaReady() {
+    setIsMediaReady(true)
+    setMediaDuration(mediaRef.current?.duration ?? null)
+    applyPendingSeek()
+  }
+
   function startGuidedReview() {
     if (!mediaRef.current) {
       return
@@ -474,6 +499,7 @@ export function SessionDetailPage() {
   const isProcessing = session.status === 'uploaded' || isAnalyzing || evaluation?.status === 'pending'
   const mediaUrl = session.mediaFile ? `${API_BASE_URL}${session.mediaFile.url}` : null
   const isAudioMedia = session.mediaFile?.contentType.startsWith('audio/') ?? false
+  const currentDuration = mediaDuration ?? session?.mediaFile?.durationSeconds ?? evaluation?.transcription?.durationSeconds ?? null
 
   return (
     <div className="px-4 pb-6 pt-28 sm:px-6 sm:pb-8 lg:px-8 lg:pb-12">
@@ -657,10 +683,11 @@ export function SessionDetailPage() {
                       mediaRef.current = node
                     }}
                     src={mediaUrl}
-                    controls
-                    className="w-full"
+                    className="hidden"
                     preload="metadata"
-                    onLoadedMetadata={() => setMediaDuration(mediaRef.current?.duration ?? null)}
+                    onLoadedMetadata={handleMediaReady}
+                    onCanPlay={handleMediaReady}
+                    onDurationChange={handleMediaReady}
                     onTimeUpdate={handleTimeUpdate}
                     onSeeking={handleSeeking}
                     onSeeked={handleSeeked}
@@ -675,10 +702,11 @@ export function SessionDetailPage() {
                       mediaRef.current = node
                     }}
                     src={mediaUrl}
-                    controls
                     className="w-full rounded-xl bg-black"
                     preload="metadata"
-                    onLoadedMetadata={() => setMediaDuration(mediaRef.current?.duration ?? null)}
+                    onLoadedMetadata={handleMediaReady}
+                    onCanPlay={handleMediaReady}
+                    onDurationChange={handleMediaReady}
                     onTimeUpdate={handleTimeUpdate}
                     onSeeking={handleSeeking}
                     onSeeked={handleSeeked}
@@ -689,47 +717,113 @@ export function SessionDetailPage() {
                   </video>
                 )}
 
-                {guidedModeEnabled && activeCoachNote && (
-                  <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-white/20 bg-slate-900/95 p-4 text-white shadow-2xl sm:inset-x-4 sm:bottom-4 sm:p-6">
+                <div className={cn('mt-3 rounded-2xl border border-border bg-background/90 p-4 shadow-sm', isAudioMedia && 'block')}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      onClick={() => {
+                        if (!mediaRef.current) return
+                        if (isPlaying) {
+                          mediaRef.current.pause()
+                        } else {
+                          void mediaRef.current.play()
+                        }
+                      }}
+                      disabled={!mediaRef.current}
+                    >
+                      {isPlaying ? 'Pause' : 'Play'}
+                    </Button>
+                    <Button variant="secondary" onClick={() => seekToTimestamp(Math.max(0, currentTime - 5))} disabled={!mediaRef.current}>
+                      Rewind 5s
+                    </Button>
+                    <Button variant="secondary" onClick={() => seekToTimestamp(Math.min(currentDuration ?? currentTime + 5, currentTime + 5))} disabled={!mediaRef.current}>
+                      Forward 5s
+                    </Button>
+                    <div className="ml-auto text-xs text-muted-foreground">
+                      {formatTimestamp(currentTime)} / {currentDuration != null ? formatTimestamp(currentDuration) : '--:--'}
+                    </div>
+                  </div>
+
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(0, currentDuration ?? 0)}
+                    step={0.01}
+                    value={Math.min(currentTime, currentDuration ?? currentTime)}
+                    onMouseDown={handleSeeking}
+                    onTouchStart={handleSeeking}
+                    onChange={(event) => {
+                      const nextTime = Number(event.target.value)
+                      if (!Number.isNaN(nextTime)) {
+                        seekToTimestamp(nextTime)
+                      }
+                    }}
+                    className="mt-4 h-2 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+                  />
+                </div>
+
+              </div>
+
+              <div
+                className={cn(
+                  'mt-3 overflow-hidden rounded-2xl border border-border bg-background/90 shadow-sm transition-all duration-300 ease-out',
+                  visibleCoachNote ? 'max-h-96 opacity-100 translate-y-0' : 'pointer-events-none max-h-0 opacity-0 -translate-y-2',
+                )}
+              >
+                {visibleCoachNote && (
+                  <div className="p-4 sm:p-5">
                     <div className="flex gap-3 sm:gap-4">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-200 sm:h-12 sm:w-12">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 text-cyan-700 ring-1 ring-cyan-500/20 sm:h-12 sm:w-12">
                         <Bot size={20} />
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <h4 className="text-xs font-bold uppercase tracking-[0.14em] text-cyan-200 sm:text-sm">
-                          {activeCoachNote.title ?? 'Coach Insight'}
-                        </h4>
-                        <p className="mt-1 text-xs text-white/70 sm:text-sm">
-                          {activeCoachNote.category} · {activeCoachNote.severity}
-                        </p>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <h4 className="text-xs font-bold uppercase tracking-[0.14em] text-cyan-700 sm:text-sm">
+                              {visibleCoachNote.title ?? 'Coach Insight'}
+                            </h4>
+                            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+                              {visibleCoachNote.category} · {visibleCoachNote.severity}
+                              {visibleCoachNote.timestampSeconds != null && (
+                                <> · {formatTimestamp(visibleCoachNote.timestampSeconds)}</>
+                              )}
+                            </p>
+                          </div>
 
-                        <div className="mt-3 text-sm leading-relaxed text-white sm:text-base">
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              variant="secondary"
+                              onClick={replayRecentClip}
+                              disabled={!mediaRef.current}
+                            >
+                              Rewind 5s
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              onClick={() => openFeedbackNote(visibleCoachNote)}
+                              className="border border-border bg-white/60"
+                            >
+                              Open note
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 rounded-2xl bg-muted/35 p-4 text-sm leading-relaxed text-foreground">
                           <TypewriterText
-                            key={`${activeCoachNote.timestampSeconds ?? 'none'}-${activeCoachNote.coachScript ?? activeCoachNote.message}`}
-                            text={activeCoachNote.coachScript ?? activeCoachNote.message}
+                            key={`${visibleCoachNote.timestampSeconds ?? 'none'}-${visibleCoachNote.coachScript ?? visibleCoachNote.message}`}
+                            text={visibleCoachNote.coachScript ?? visibleCoachNote.message}
                           />
                         </div>
 
-                        <div className="mt-5 flex flex-wrap gap-2 sm:gap-3">
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Button onClick={continueGuidedReview}>
+                            Continue
+                          </Button>
                           <Button
                             variant="secondary"
-                            className="border-white/20 bg-white/10 text-white hover:bg-white/20"
-                            onClick={replayRecentClip}
+                            onClick={() => setSelectedFeedbackNote(null)}
                           >
-                            ⏪ Rewind 5s & Listen
-                          </Button>
-
-                          <Button onClick={continueGuidedReview}>
-                            Got it, continue ▶
-                          </Button>
-
-                          <Button
-                            variant="ghost"
-                            className="border border-white/20 bg-white/5 text-white hover:bg-white/15"
-                            onClick={() => openFeedbackNote(activeCoachNote)}
-                          >
-                            Open note details
+                            Dismiss
                           </Button>
                         </div>
                       </div>
@@ -988,73 +1082,56 @@ export function SessionDetailPage() {
         )}
 
         {selectedFeedbackNote && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
-            onClick={closeFeedbackNote}
-          >
-            <div
-              className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {selectedFeedbackNote.category}
-                  </p>
-                  <h3 className="mt-1 text-2xl font-semibold text-foreground">
-                    {selectedFeedbackNote.title ?? 'Feedback detail'}
-                  </h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Severity: <span className="font-medium text-foreground">{selectedFeedbackNote.severity}</span>
-                  </p>
+          <div className="mt-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Detail view
+                </p>
+                <h3 className="mt-1 text-xl font-semibold text-foreground">
+                  {selectedFeedbackNote.title ?? 'Feedback detail'}
+                </h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {selectedFeedbackNote.category} · {selectedFeedbackNote.severity}
                   {selectedFeedbackNote.timestampSeconds != null && (
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Timestamp: <span className="font-medium text-foreground">{formatTimestamp(selectedFeedbackNote.timestampSeconds)}</span>
-                      {selectedFeedbackNote.endTimestampSeconds != null && (
-                        <> to <span className="font-medium text-foreground">{formatTimestamp(selectedFeedbackNote.endTimestampSeconds)}</span></>
-                      )}
-                    </p>
+                    <> · {formatTimestamp(selectedFeedbackNote.timestampSeconds)}</>
                   )}
-                </div>
-                <button
-                  onClick={closeFeedbackNote}
-                  className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  aria-label="Close feedback detail"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="mt-5 rounded-2xl bg-muted/35 p-4">
-                <p className="text-sm font-semibold text-foreground">What this means</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {selectedFeedbackNote.message}
                 </p>
               </div>
+              <button
+                onClick={closeFeedbackNote}
+                className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Close feedback detail"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-              {selectedFeedbackNote.coachScript && (
-                <div className="mt-4 rounded-2xl border border-primary/10 bg-primary/5 p-4">
-                  <p className="text-sm font-semibold text-foreground">Coach script</p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {selectedFeedbackNote.coachScript}
-                  </p>
-                </div>
-              )}
+            <div className="mt-4 rounded-2xl bg-muted/35 p-4">
+              <p className="text-sm font-semibold text-foreground">What this means</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {selectedFeedbackNote.message}
+              </p>
+            </div>
 
-              <div className="mt-6 flex flex-wrap gap-2">
-                {selectedFeedbackNote.timestampSeconds != null && (
-                  <Button
-                    onClick={() => {
-                      seekToTimestamp(selectedFeedbackNote.timestampSeconds!)
-                    }}
-                  >
-                    Jump to this moment
-                  </Button>
-                )}
-                <Button variant="secondary" onClick={closeFeedbackNote}>
-                  Close
-                </Button>
+            {selectedFeedbackNote.coachScript && (
+              <div className="mt-4 rounded-2xl border border-primary/10 bg-primary/5 p-4">
+                <p className="text-sm font-semibold text-foreground">Coach script</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {selectedFeedbackNote.coachScript}
+                </p>
               </div>
+            )}
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              {selectedFeedbackNote.timestampSeconds != null && (
+                <Button onClick={() => seekToTimestamp(selectedFeedbackNote.timestampSeconds!)}>
+                  Jump to this moment
+                </Button>
+              )}
+              <Button variant="secondary" onClick={closeFeedbackNote}>
+                Close
+              </Button>
             </div>
           </div>
         )}
