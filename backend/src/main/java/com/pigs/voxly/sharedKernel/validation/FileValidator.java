@@ -16,10 +16,12 @@ public final class FileValidator {
     }
 
     private static final Set<String> ALLOWED_VIDEO_TYPES = Set.of(
-            "video/mp4");
+            "video/mp4",
+            "video/webm");
 
     private static final Set<String> ALLOWED_VIDEO_EXTENSIONS = Set.of(
-            ".mp4");
+            ".mp4",
+            ".webm");
 
     private static final Set<String> ALLOWED_AUDIO_TYPES = Set.of(
             "audio/webm",
@@ -31,6 +33,7 @@ public final class FileValidator {
 
     private static final Set<String> ALLOWED_AUDIO_EXTENSIONS = Set.of(
             ".webm",
+            ".weba",
             ".m4a",
             ".mp4",
             ".mp3",
@@ -60,6 +63,7 @@ public final class FileValidator {
      */
     public static Result validateVideo(String fileName, String contentType, long fileSize, long maxSize) {
         List<Error> errors = new ArrayList<>();
+        String normalizedContentType = normalizeContentType(contentType);
 
         if (fileName == null || fileName.isBlank()) {
             errors.add(Error.validation("File.NoName", "File name is required"));
@@ -71,7 +75,7 @@ public final class FileValidator {
             }
         }
 
-        if (contentType == null || !ALLOWED_VIDEO_TYPES.contains(contentType.toLowerCase())) {
+        if (normalizedContentType == null || !ALLOWED_VIDEO_TYPES.contains(normalizedContentType)) {
             errors.add(Error.validation("File.InvalidVideoType",
                     "Invalid video content type. Allowed: " + ALLOWED_VIDEO_TYPES));
         }
@@ -103,6 +107,7 @@ public final class FileValidator {
      */
     public static Result validateAudio(String fileName, String contentType, long fileSize, long maxSize) {
         List<Error> errors = new ArrayList<>();
+        String normalizedContentType = normalizeContentType(contentType);
 
         if (fileName == null || fileName.isBlank()) {
             errors.add(Error.validation("File.NoName", "File name is required"));
@@ -114,7 +119,7 @@ public final class FileValidator {
             }
         }
 
-        if (contentType == null || !ALLOWED_AUDIO_TYPES.contains(contentType.toLowerCase())) {
+        if (normalizedContentType == null || !ALLOWED_AUDIO_TYPES.contains(normalizedContentType)) {
             errors.add(Error.validation("File.InvalidAudioType",
                     "Invalid audio content type. Allowed: " + ALLOWED_AUDIO_TYPES));
         }
@@ -146,6 +151,7 @@ public final class FileValidator {
      */
     public static Result validateDocument(String fileName, String contentType, long fileSize, long maxSize) {
         List<Error> errors = new ArrayList<>();
+        String normalizedContentType = normalizeContentType(contentType);
 
         if (fileName == null || fileName.isBlank()) {
             errors.add(Error.validation("File.NoName", "File name is required"));
@@ -157,7 +163,7 @@ public final class FileValidator {
             }
         }
 
-        if (contentType != null && !ALLOWED_DOCUMENT_TYPES.contains(contentType.toLowerCase())) {
+        if (normalizedContentType != null && !ALLOWED_DOCUMENT_TYPES.contains(normalizedContentType)) {
             errors.add(Error.validation("File.InvalidDocumentType",
                     "Invalid document content type. Allowed: PDF, PPTX, PPT"));
         }
@@ -220,20 +226,41 @@ public final class FileValidator {
      * Checks if the content type indicates a video file.
      */
     public static boolean isVideoContentType(String contentType) {
-        return contentType != null && ALLOWED_VIDEO_TYPES.contains(contentType.toLowerCase());
+        String normalizedContentType = normalizeContentType(contentType);
+        return normalizedContentType != null && ALLOWED_VIDEO_TYPES.contains(normalizedContentType);
     }
 
     /**
      * Checks if the content type indicates an audio file.
      */
     public static boolean isAudioContentType(String contentType) {
-        return contentType != null && ALLOWED_AUDIO_TYPES.contains(contentType.toLowerCase());
+        String normalizedContentType = normalizeContentType(contentType);
+        return normalizedContentType != null && ALLOWED_AUDIO_TYPES.contains(normalizedContentType);
     }
 
     /**
      * Checks if the content type indicates a document file.
      */
     public static boolean isDocumentContentType(String contentType) {
-        return contentType != null && ALLOWED_DOCUMENT_TYPES.contains(contentType.toLowerCase());
+        String normalizedContentType = normalizeContentType(contentType);
+        return normalizedContentType != null && ALLOWED_DOCUMENT_TYPES.contains(normalizedContentType);
+    }
+
+    public static boolean isAudioFileName(String fileName) {
+        return ALLOWED_AUDIO_EXTENSIONS.contains(getExtension(fileName).toLowerCase());
+    }
+
+    private static String normalizeContentType(String contentType) {
+        if (contentType == null) {
+            return null;
+        }
+
+        String normalized = contentType.trim().toLowerCase();
+        int separatorIndex = normalized.indexOf(';');
+        if (separatorIndex >= 0) {
+            normalized = normalized.substring(0, separatorIndex).trim();
+        }
+
+        return normalized.isBlank() ? null : normalized;
     }
 }

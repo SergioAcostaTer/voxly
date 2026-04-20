@@ -78,6 +78,46 @@ public class SessionService {
         return ResultT.success(SessionResponse.fromDomain(session));
     }
 
+    @Transactional
+    public ResultT<SessionResponse> createSessionWithMedia(CreateSessionRequest request, MultipartFile file) {
+        var userIdOpt = currentUserProvider.getUserId();
+        if (userIdOpt.isEmpty()) {
+            return ResultT.failure(SessionErrors.NOT_OWNER);
+        }
+
+        var titleResult = SessionTitle.create(request.title());
+        if (titleResult.isFailure()) {
+            return ResultT.failure(titleResult.getError());
+        }
+
+        var sessionType = SessionType.fromName(request.sessionType());
+
+        var validationResult = validateMediaFile(file);
+        if (validationResult.isFailure()) {
+            return ResultT.failure(validationResult.getError());
+        }
+
+        var sessionResult = Session.create(
+                UserId.from(userIdOpt.get()),
+                titleResult.getValue(),
+                request.description(),
+                sessionType,
+                request.language());
+
+        if (sessionResult.isFailure()) {
+            return ResultT.failure(sessionResult.getError());
+        }
+
+        var session = sessionResult.getValue();
+        var uploadResult = storeAndAttachMedia(session, file);
+        if (uploadResult.isFailure()) {
+            return ResultT.failure(uploadResult.getError());
+        }
+
+        sessionRepository.save(session);
+        return ResultT.success(SessionResponse.fromDomain(session));
+    }
+
     public ResultT<SessionResponse> getSession(UUID sessionId) {
         var userIdOpt = currentUserProvider.getUserId();
         if (userIdOpt.isEmpty()) {
@@ -163,49 +203,18 @@ public class SessionService {
 
         var session = sessionOpt.get();
 
-        // Validate file
-        var contentType = file.getContentType();
-        var validationResult = FileValidator.isAudioContentType(contentType)
-                ? FileValidator.validateAudio(file.getOriginalFilename(), contentType, file.getSize())
-                : FileValidator.validateVideo(file.getOriginalFilename(), contentType, file.getSize());
-
+        var validationResult = validateMediaFile(file);
         if (validationResult.isFailure()) {
             return ResultT.failure(validationResult.getError());
         }
 
-        // Store file
-        try {
-            var directory = "sessions/" + sessionId;
-            var storeResult = storageService.store(
-                    file.getInputStream(),
-                    file.getOriginalFilename(),
-                    file.getContentType(),
-                    directory);
-
-            if (storeResult.isFailure()) {
-                return ResultT.failure(storeResult.getError());
-            }
-
-            var mediaFile = MediaFile.create(
-                    storeResult.getValue(),
-                    file.getOriginalFilename(),
-                    file.getContentType(),
-                    file.getSize());
-
-            var uploadResult = session.uploadMedia(mediaFile);
-            if (uploadResult.isFailure()) {
-                // Clean up stored file
-                storageService.delete(storeResult.getValue());
-                return ResultT.failure(uploadResult.getError());
-            }
-
-            sessionRepository.save(session);
-            return ResultT.success(SessionResponse.fromDomain(session));
-
-        } catch (IOException e) {
-            return ResultT.failure(com.pigs.voxly.sharedKernel.domain.results.Error.failure(
-                    "Session.UploadFailed", "Failed to upload media: " + e.getMessage()));
+        var uploadResult = storeAndAttachMedia(session, file);
+        if (uploadResult.isFailure()) {
+            return ResultT.failure(uploadResult.getError());
         }
+
+        sessionRepository.save(session);
+        return ResultT.success(SessionResponse.fromDomain(session));
     }
 
     @Transactional
@@ -268,5 +277,66 @@ public class SessionService {
         }
 
         return result;
+    }
+
+    private Result validateMediaFile(MultipartFile file) {
+        var contentType = file.getContentType();
+        var normalizedFileName = normalizeUploadedFileName(file.getOriginalFilename(), contentType);
+        boolean isAudioUpload = FileValidator.isAudioContentType(contentType)
+                || (!FileValidator.isVideoContentType(contentType)
+                        && FileValidator.isAudioFileName(normalizedFileName));
+        return isAudioUpload
+                ? FileValidator.validateAudio(normalizedFileName, contentType, file.getSize())
+                : FileValidator.validateVideo(normalizedFileName, contentType, file.getSize());
+    }
+
+    private Result storeAndAttachMedia(Session session, MultipartFile file) {
+        try {
+            var directory = "sessions/" + session.getId().getValue();
+            var normalizedFileName = normalizeUploadedFileName(file.getOriginalFilename(), file.getContentType());
+            var storeResult = storageService.store(
+                    file.getInputStream(),
+                    normalizedFileName,
+                    file.getContentType(),
+                    directory);
+
+            if (storeResult.isFailure()) {
+                return Result.failure(storeResult.getError());
+            }
+
+            var mediaFile = MediaFile.create(
+                    storeResult.getValue(),
+                    normalizedFileName,
+                    file.getContentType(),
+                    file.getSize());
+
+            var uploadResult = session.uploadMedia(mediaFile);
+            if (uploadResult.isFailure()) {
+                storageService.delete(storeResult.getValue());
+                return Result.failure(uploadResult.getError());
+            }
+
+            return Result.success();
+        } catch (IOException e) {
+            return Result.failure(com.pigs.voxly.sharedKernel.domain.results.Error.failure(
+                    "Session.UploadFailed", "Failed to upload media: " + e.getMessage()));
+        }
+    }
+
+    private String normalizeUploadedFileName(String originalFileName, String contentType) {
+        String fallbackFileName = originalFileName == null || originalFileName.isBlank()
+                ? "upload"
+                : originalFileName;
+
+        String normalizedContentType = contentType == null ? "" : contentType.trim().toLowerCase();
+        if (!fallbackFileName.toLowerCase().endsWith(".weba")) {
+            return fallbackFileName;
+        }
+
+        if (normalizedContentType.startsWith("audio/webm") || normalizedContentType.startsWith("video/webm")) {
+            return fallbackFileName.substring(0, fallbackFileName.length() - 5) + ".webm";
+        }
+
+        return fallbackFileName;
     }
 }

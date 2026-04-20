@@ -1,12 +1,13 @@
-import { BarChart3, LogOut, Mic2, Plus, TrendingUp, Video } from 'lucide-react'
+import { BarChart3, Mic2, Plus, TrendingUp, Video } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { AUTH_BYPASS_ENABLED } from '../auth/testing-auth'
 import { useAuth } from '../auth/useAuth'
+import { AppHeader } from '../components/AppHeader'
 import { api, ApiClientError } from '../lib/api'
 import type { ProgressSummary } from '../types/progress'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
-import { Logo } from '../ui/Logo'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -26,6 +27,9 @@ export function DashboardPage() {
         }
       } catch (error) {
         if (error instanceof ApiClientError && error.status === 401) {
+          if (AUTH_BYPASS_ENABLED) {
+            return
+          }
           await logout()
           navigate('/login', { replace: true })
         }
@@ -39,21 +43,10 @@ export function DashboardPage() {
     }
   }, [accessToken, logout, navigate])
 
-  async function handleLogout() {
-    await logout()
-    navigate('/login', { replace: true })
-  }
-
   return (
-    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:py-12">
-      <div className="mx-auto w-full max-w-5xl space-y-6">
-        <header className="flex items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-panel backdrop-blur-sm">
-          <Logo />
-          <Button variant="secondary" onClick={handleLogout}>
-            <LogOut size={16} />
-            Log out
-          </Button>
-        </header>
+    <div className="px-4 pb-6 pt-28 sm:px-6 sm:pb-8 lg:px-8 lg:pb-12">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <AppHeader />
 
         <Card className="bg-gradient-to-br from-primary to-cyan-700 text-primary-foreground">
           <p className="display-font text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground/80">

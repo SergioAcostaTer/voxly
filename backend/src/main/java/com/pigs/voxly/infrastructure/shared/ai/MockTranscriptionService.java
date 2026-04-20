@@ -15,7 +15,7 @@ import java.util.List;
  * Returns realistic sample data without calling external APIs.
  */
 @Service
-@ConditionalOnProperty(name = "app.ai.provider", havingValue = "mock", matchIfMissing = true)
+@ConditionalOnProperty(name = "app.ai.provider", havingValue = "mock")
 public class MockTranscriptionService implements TranscriptionService {
 
     private static final Logger log = LoggerFactory.getLogger(MockTranscriptionService.class);

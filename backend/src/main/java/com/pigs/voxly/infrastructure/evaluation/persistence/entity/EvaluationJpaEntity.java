@@ -66,7 +66,7 @@ public class EvaluationJpaEntity {
     @Column(name = "improvements_json", columnDefinition = "TEXT")
     private String improvementsJson;
 
-    @Column(name = "error_message")
+    @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
     @Column(name = "created_at", nullable = false)

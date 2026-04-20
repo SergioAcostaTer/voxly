@@ -2,7 +2,7 @@
 springdotenv:
   directory: .
 
-debug: true
+debug: false
 
 spring:
   application:
@@ -24,10 +24,10 @@ spring:
     hibernate:
       ddl-auto: update
     open-in-view: false
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
 
   servlet:
     multipart:
@@ -90,6 +90,19 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+logging:
+  level:
+    root: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+    org.hibernate.SQL: OFF
+    org.hibernate.orm.jdbc.bind: OFF
+    org.springframework.web: WARN
+    org.springframework.web.client: WARN
+    org.springframework.security: WARN
+    com.zaxxer.hikari: WARN
+    com.pigs.voxly: INFO
+
 app:
   jwt:
     secret-key: ${JWT_SECRET_KEY}
@@ -113,3 +126,5 @@ app:
     type: ${STORAGE_TYPE:s3}
     base-url: ${STORAGE_BASE_URL:/api/v1/files}
     max-file-size-bytes: ${MAX_FILE_SIZE_BYTES:104857600}
+  ai:
+    provider: ${AI_PROVIDER:openai}

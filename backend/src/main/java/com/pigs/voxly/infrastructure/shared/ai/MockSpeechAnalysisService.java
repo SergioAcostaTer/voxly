@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
  * Performs basic text analysis without calling external AI APIs.
  */
 @Service
-@ConditionalOnProperty(name = "app.ai.provider", havingValue = "mock", matchIfMissing = true)
+@ConditionalOnProperty(name = "app.ai.provider", havingValue = "mock")
 public class MockSpeechAnalysisService implements SpeechAnalysisService {
 
     private static final Logger log = LoggerFactory.getLogger(MockSpeechAnalysisService.class);

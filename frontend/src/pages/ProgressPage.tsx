@@ -11,12 +11,13 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { AUTH_BYPASS_ENABLED } from '../auth/testing-auth'
 import { useAuth } from '../auth/useAuth'
+import { AppHeader } from '../components/AppHeader'
 import { api, ApiClientError } from '../lib/api'
 import type { ProgressSummary, SessionTrend } from '../types/progress'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
-import { Logo } from '../ui/Logo'
 
 export function ProgressPage() {
   const navigate = useNavigate()
@@ -39,6 +40,10 @@ export function ProgressPage() {
       setTrends(trendsData)
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
+        if (AUTH_BYPASS_ENABLED) {
+          setError('Testing mode is active but the backend did not accept the test user request.')
+          return
+        }
         await logout()
         navigate('/login', { replace: true })
         return
@@ -76,19 +81,9 @@ export function ProgressPage() {
   }
 
   return (
-    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:py-12">
-      <div className="mx-auto w-full max-w-5xl space-y-6">
-        <header className="flex items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-panel backdrop-blur-sm">
-          <Logo />
-          <nav className="flex items-center gap-2">
-            <Link to="/dashboard">
-              <Button variant="ghost">Dashboard</Button>
-            </Link>
-            <Link to="/sessions">
-              <Button variant="ghost">Sessions</Button>
-            </Link>
-          </nav>
-        </header>
+    <div className="px-4 pb-6 pt-28 sm:px-6 sm:pb-8 lg:px-8 lg:pb-12">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <AppHeader />
 
         {error && (
           <Card className="border-red-200 bg-red-50">

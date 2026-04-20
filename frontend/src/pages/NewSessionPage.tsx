@@ -1,13 +1,14 @@
 import { AlertCircle, ArrowLeft, Loader2, Mic2, Square, Upload } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { AUTH_BYPASS_ENABLED } from '../auth/testing-auth'
 import { useAuth } from '../auth/useAuth'
+import { AppHeader } from '../components/AppHeader'
 import { api, ApiClientError } from '../lib/api'
 import type { SessionType, SupportedLanguage } from '../types/sessions'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Input } from '../ui/Input'
-import { Logo } from '../ui/Logo'
 import { Select } from '../ui/Select'
 
 const SESSION_TYPES: { value: SessionType; label: string; description: string }[] = [
@@ -26,6 +27,15 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
 const SUPPORTED_UPLOAD_TYPES = ['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4']
 const RECORDING_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
 
+function getRecordedFileExtension(mimeType: string) {
+  const normalizedMimeType = mimeType.toLowerCase()
+  if (normalizedMimeType.includes('webm')) return 'webm'
+  if (mimeType.includes('mp4')) return 'm4a'
+  if (mimeType.includes('mpeg')) return 'mp3'
+  if (mimeType.includes('ogg')) return 'ogg'
+  return 'webm'
+}
+
 export function NewSessionPage() {
   const navigate = useNavigate()
   const { accessToken, logout } = useAuth()
@@ -39,7 +49,6 @@ export function NewSessionPage() {
   const [recordingPreviewUrl, setRecordingPreviewUrl] = useState<string | null>(null)
 
   const [step, setStep] = useState<'details' | 'upload' | 'processing'>('details')
-  const [sessionId, setSessionId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -147,12 +156,14 @@ export function NewSessionPage() {
       }
 
       recorder.onstop = () => {
-        const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
-        const extension = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('mpeg') ? 'mp3' : 'webm'
+        const mimeType = recorder.mimeType || 'audio/webm'
+        const extension = getRecordedFileExtension(mimeType)
+        const normalizedMimeType = extension === 'webm' ? 'audio/webm' : mimeType
+        const blob = new Blob(recordingChunksRef.current, { type: normalizedMimeType })
         const recordedFile = new File(
           [blob],
           `voxly-audio-recording-${Date.now()}.${extension}`,
-          { type: blob.type || 'audio/webm' },
+          { type: normalizedMimeType },
         )
 
         const previewUrl = URL.createObjectURL(blob)
@@ -183,29 +194,13 @@ export function NewSessionPage() {
 
   async function handleCreateSession(e: React.FormEvent) {
     e.preventDefault()
-    if (!accessToken || !title.trim()) return
-
-    setIsSubmitting(true)
+    if (!title.trim()) return
     setError(null)
-
-    try {
-      const session = await api.createSession(accessToken, { title: title.trim(), sessionType: type, language })
-      setSessionId(session.id)
-      setStep('upload')
-    } catch (err) {
-      if (err instanceof ApiClientError && err.status === 401) {
-        await logout()
-        navigate('/login', { replace: true })
-        return
-      }
-      setError(err instanceof Error ? err.message : 'Failed to create session')
-    } finally {
-      setIsSubmitting(false)
-    }
+    setStep('upload')
   }
 
   async function handleUpload() {
-    if (!accessToken || !sessionId || !file) return
+    if (!accessToken || !file || !title.trim()) return
 
     setIsSubmitting(true)
     setError(null)
@@ -213,17 +208,24 @@ export function NewSessionPage() {
     setUploadProgress(0)
 
     try {
-      await api.uploadSessionMedia(accessToken, sessionId, file, setUploadProgress)
+      const session = await api.createSessionWithMedia(
+        accessToken,
+        { title: title.trim(), sessionType: type, language },
+        file,
+        setUploadProgress,
+      )
       setUploadProgress(100)
 
-      // Request analysis
-      await api.requestAnalysis(accessToken, sessionId)
+      await api.requestAnalysis(accessToken, session.id)
 
-      // Navigate to session detail
-      navigate(`/sessions/${sessionId}`, { replace: true })
+      navigate(`/sessions/${session.id}`, { replace: true })
     } catch (err) {
       setStep('upload')
       if (err instanceof ApiClientError && err.status === 401) {
+        if (AUTH_BYPASS_ENABLED) {
+          setError('Testing mode is active but the backend did not accept the test user request.')
+          return
+        }
         await logout()
         navigate('/login', { replace: true })
         return
@@ -242,17 +244,18 @@ export function NewSessionPage() {
   }
 
   return (
-    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:py-12">
+    <div className="px-4 pb-6 pt-28 sm:px-6 sm:pb-8 lg:px-8 lg:pb-12">
       <div className="mx-auto w-full max-w-2xl space-y-6">
-        <header className="flex items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-panel backdrop-blur-sm">
-          <Logo />
-          <Link to="/sessions">
-            <Button variant="ghost">
-              <ArrowLeft size={18} />
-              Back
-            </Button>
-          </Link>
-        </header>
+        <AppHeader
+          rightSlot={
+            <Link to="/sessions">
+              <Button variant="ghost">
+                <ArrowLeft size={18} />
+                Back
+              </Button>
+            </Link>
+          }
+        />
 
         <Card>
           <div className="mb-6">

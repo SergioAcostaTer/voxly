@@ -2,7 +2,6 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { useAuth } from './auth/useAuth'
 import { AppErrorBoundary } from './components/AppErrorBoundary'
-import { ConnectivityBanner } from './components/ConnectivityBanner'
 import { AuthPage } from './pages/AuthPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LandingPage } from './pages/LandingPage'
@@ -33,7 +32,6 @@ function App() {
   return (
     <AppErrorBoundary>
       <BrowserRouter>
-        <ConnectivityBanner />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<PublicOnlyAuthPage mode="login" />} />

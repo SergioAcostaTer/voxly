@@ -13,14 +13,15 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { AUTH_BYPASS_ENABLED } from '../auth/testing-auth'
 import { useAuth } from '../auth/useAuth'
+import { AppHeader } from '../components/AppHeader'
 import { api, ApiClientError } from '../lib/api'
 import { cn } from '../lib/cn'
 import type { Evaluation, FeedbackNote, FeedbackResponse } from '../types/evaluation'
 import type { Session } from '../types/sessions'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
-import { Logo } from '../ui/Logo'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -131,6 +132,10 @@ export function SessionDetailPage() {
             setEvaluation(null)
             setFeedback(null)
           } else if (evaluationError instanceof ApiClientError && evaluationError.status === 401) {
+            if (AUTH_BYPASS_ENABLED) {
+              setError('Testing mode is active but the backend did not accept the test user request.')
+              return
+            }
             await logout()
             navigate('/login', { replace: true })
             return
@@ -144,6 +149,10 @@ export function SessionDetailPage() {
       setLastSyncedAt(new Date())
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
+        if (AUTH_BYPASS_ENABLED) {
+          setError('Testing mode is active but the backend did not accept the test user request.')
+          return
+        }
         await logout()
         navigate('/login', { replace: true })
         return
@@ -259,17 +268,18 @@ export function SessionDetailPage() {
   const isAudioMedia = session.mediaFile?.contentType.startsWith('audio/') ?? false
 
   return (
-    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:py-12">
-      <div className="mx-auto w-full max-w-5xl space-y-6">
-        <header className="flex items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-panel backdrop-blur-sm">
-          <Logo />
-          <Link to="/sessions">
-            <Button variant="ghost">
-              <ArrowLeft size={18} />
-              Back
-            </Button>
-          </Link>
-        </header>
+    <div className="px-4 pb-6 pt-28 sm:px-6 sm:pb-8 lg:px-8 lg:pb-12">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <AppHeader
+          rightSlot={
+            <Link to="/sessions">
+              <Button variant="ghost">
+                <ArrowLeft size={18} />
+                Back
+              </Button>
+            </Link>
+          }
+        />
 
         {error && (
           <Card className="border-red-200 bg-red-50">

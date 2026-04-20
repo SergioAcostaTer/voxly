@@ -24,8 +24,10 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectCannedACL;
@@ -80,6 +82,7 @@ public class R2StorageService implements StorageService {
             throw new IllegalStateException("Could not initialize temp directory for media processing", e);
         }
 
+        ensureBucketExists();
         logger.info("R2StorageService initialized with bucket: {}", bucketName);
     }
 
@@ -101,7 +104,7 @@ public class R2StorageService implements StorageService {
                     .contentLength((long) fileBytes.length)
                     .build();
 
-            s3Client.putObject(putRequest, RequestBody.fromBytes(fileBytes));
+            putObjectEnsuringBucketExists(putRequest, fileBytes);
 
             logger.info("File uploaded successfully to R2: {}", key);
             return ResultT.success(key);
@@ -164,7 +167,7 @@ public class R2StorageService implements StorageService {
     public Path getAbsolutePath(String storagePath) {
         try {
             Files.createDirectories(tempDir);
-            Path tempFile = Files.createTempFile(tempDir, "voxly-media-", ".bin");
+            Path tempFile = Files.createTempFile(tempDir, "voxly-media-", extractExtension(storagePath));
 
             GetObjectRequest getRequest = GetObjectRequest.builder()
                     .bucket(bucketName)
@@ -215,5 +218,51 @@ public class R2StorageService implements StorageService {
 
     private String sanitizeFileName(String fileName) {
         return fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    private String extractExtension(String storagePath) {
+        if (storagePath == null || storagePath.isBlank()) {
+            return ".bin";
+        }
+
+        String fileName = Path.of(storagePath).getFileName().toString();
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == fileName.length() - 1) {
+            return ".bin";
+        }
+
+        return fileName.substring(dotIndex);
+    }
+
+    private void putObjectEnsuringBucketExists(PutObjectRequest putRequest, byte[] fileBytes) {
+        try {
+            s3Client.putObject(putRequest, RequestBody.fromBytes(fileBytes));
+        } catch (S3Exception e) {
+            if (e.statusCode() == 404 || isBucketMissingError(e)) {
+                logger.warn("Bucket {} was missing during upload. Creating it and retrying once.", bucketName);
+                ensureBucketExists();
+                s3Client.putObject(putRequest, RequestBody.fromBytes(fileBytes));
+                return;
+            }
+            throw e;
+        }
+    }
+
+    private void ensureBucketExists() {
+        try {
+            s3Client.headBucket(HeadBucketRequest.builder().bucket(bucketName).build());
+        } catch (S3Exception e) {
+            if (e.statusCode() != 404 && !isBucketMissingError(e)) {
+                throw e;
+            }
+
+            logger.info("Bucket {} does not exist. Creating it.", bucketName);
+            s3Client.createBucket(CreateBucketRequest.builder().bucket(bucketName).build());
+        }
+    }
+
+    private boolean isBucketMissingError(S3Exception e) {
+        String errorCode = e.awsErrorDetails() != null ? e.awsErrorDetails().errorCode() : null;
+        return "NoSuchBucket".equals(errorCode);
     }
 }

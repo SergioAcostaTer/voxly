@@ -53,8 +53,8 @@ export function LandingPage() {
 
   return (
     <div className="relative overflow-hidden pb-20">
-      <div className="mx-auto w-full max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
-        <header className="reveal-up sticky top-3 z-50 flex items-center justify-between rounded-2xl border border-white/80 bg-white/85 px-4 py-3 shadow-panel backdrop-blur-md sm:px-5">
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-slate-200 bg-white">
+        <div className="mx-auto flex h-[72px] w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Logo />
           <nav className="hidden items-center gap-7 text-base text-muted-foreground md:flex">
             <a href="#features" className="hover:text-foreground">
@@ -92,7 +92,10 @@ export function LandingPage() {
               </>
             )}
           </div>
-        </header>
+        </div>
+      </header>
+
+      <div className="mx-auto w-full max-w-7xl px-4 pt-28 sm:px-6 lg:px-8">
 
         <section className="grid gap-8 pb-12 pt-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 lg:pt-16">
           <div className="order-2 lg:order-1">

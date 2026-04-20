@@ -182,6 +182,66 @@ export const api = {
     })
   },
 
+  createSessionWithMedia(
+    accessToken: string,
+    data: CreateSessionRequest,
+    file: File,
+    onProgress?: UploadProgressCallback,
+  ) {
+    return new Promise<Session>((resolve, reject) => {
+      const formData = new FormData()
+      formData.append('title', data.title)
+      formData.append('sessionType', data.sessionType)
+      formData.append('language', data.language)
+      if (data.description) {
+        formData.append('description', data.description)
+      }
+      formData.append('file', file)
+
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${API_BASE_URL}/v1/sessions/with-media`)
+      xhr.withCredentials = true
+      xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable || !onProgress) return
+        const percent = Math.round((event.loaded / event.total) * 100)
+        onProgress(percent)
+      }
+
+      xhr.onerror = () => {
+        reject(new ApiClientError('Upload failed due to a network error.', 0))
+      }
+
+      xhr.onload = () => {
+        const status = xhr.status
+        const payload = (() => {
+          try {
+            return JSON.parse(xhr.responseText || 'null') as ApiResponse<Session> | null
+          } catch {
+            return null
+          }
+        })()
+        const firstError = payload?.errors?.[0]
+
+        if (status < 200 || status >= 300 || !payload?.success) {
+          reject(
+            new ApiClientError(
+              firstError?.message ?? `Upload failed with status ${status}`,
+              status,
+              firstError?.code,
+            ),
+          )
+          return
+        }
+
+        resolve(payload.data as Session)
+      }
+
+      xhr.send(formData)
+    })
+  },
+
   deleteSession(accessToken: string, sessionId: string) {
     return request<void>(`/v1/sessions/${sessionId}`, {
       method: 'DELETE',

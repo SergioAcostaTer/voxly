@@ -246,6 +246,7 @@ Recommended policy:
 1. Keep defaults for MVP and early beta.
 2. Only override model values if quality is clearly insufficient.
 3. Upgrade analysis model first; keep transcription model unchanged unless needed.
+4. The default AI provider is `openai`; use `AI_PROVIDER=mock` only when you intentionally want fake local results.
 
 ### Database Schema
 

@@ -10,6 +10,7 @@ import com.pigs.voxly.sharedKernel.domain.results.ResultT;
 import java.time.Instant;
 
 public final class Evaluation extends AggregateRoot<EvaluationId> {
+    private static final int MAX_ERROR_MESSAGE_LENGTH = 255;
 
     private SessionId sessionId;
     private UserId userId;
@@ -165,9 +166,16 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
 
     public Result fail(String errorMessage) {
         this.status = EvaluationStatus.FAILED;
-        this.errorMessage = errorMessage;
+        this.errorMessage = truncate(errorMessage, MAX_ERROR_MESSAGE_LENGTH);
         this.completedAt = Instant.now();
         return Result.success();
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength - 3) + "...";
     }
 
     // ===== Getters =====

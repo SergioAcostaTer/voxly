@@ -1,5 +1,8 @@
 package com.pigs.voxly.api.identity;
 
+import java.time.Instant;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,10 +31,15 @@ public class AuthController {
 
     private final AuthService authService;
     private final AccessTokenCookieHelper cookieHelper;
+    private final boolean testingOpenAccess;
 
-    public AuthController(AuthService authService, AccessTokenCookieHelper cookieHelper) {
+    public AuthController(
+            AuthService authService,
+            AccessTokenCookieHelper cookieHelper,
+            @Value("${app.auth.testing-open-access:false}") boolean testingOpenAccess) {
         this.authService = authService;
         this.cookieHelper = cookieHelper;
+        this.testingOpenAccess = testingOpenAccess;
     }
 
     @PostMapping("/register")
@@ -84,6 +92,13 @@ public class AuthController {
     @Operation(summary = "Issue a new access token using the cookie token")
     public ResponseEntity<ApiResponse<AccessTokenResponse>> issueAccessToken(
             @CookieValue(name = "access_token", required = false) String accessTokenCookie) {
+
+        if (testingOpenAccess) {
+            var testingToken = new AccessTokenResponse("testing-bypass", Instant.now().plusSeconds(3600));
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, cookieHelper.createCookie("testing-bypass").toString())
+                    .body(ApiResponse.ok(testingToken));
+        }
 
         if (accessTokenCookie == null || accessTokenCookie.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

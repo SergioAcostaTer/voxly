@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +39,7 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
         this.aiProperties = aiProperties;
         this.objectMapper = objectMapper;
         this.restClient = RestClient.builder()
-                .defaultHeader("Authorization", "Bearer " + aiProperties.openai().apiKey())
+                .defaultHeader("Authorization", "Bearer " + aiProperties.apiKey())
                 .build();
     }
 
@@ -71,6 +72,13 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
                 avgSentenceLength, clarityScore
         );
 
+        if (aiProperties.apiKey() == null || aiProperties.apiKey().isBlank()) {
+            return ResultT.failure(Error.failure(
+                    "Analysis.OpenAiNotConfigured",
+                    "OPENAI_API_KEY is not configured"
+            ));
+        }
+
         // Use GPT for qualitative feedback
         try {
             var gptFeedback = getGptFeedback(transcription, sessionType, metrics);
@@ -89,8 +97,11 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
             return ResultT.success(result);
 
         } catch (Exception e) {
-            log.error("GPT analysis failed, falling back to local analysis", e);
-            return ResultT.success(buildLocalFallback(metrics, fillerWords, pauses, sessionType));
+            log.error("GPT analysis failed", e);
+            return ResultT.failure(Error.failure(
+                    "Analysis.Failed",
+                    "OpenAI analysis failed: " + summarizeException(e)
+            ));
         }
     }
 
@@ -102,7 +113,7 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
         String prompt = buildPrompt(transcription, sessionType, metrics);
 
         var requestBody = Map.of(
-                "model", aiProperties.openai().model(),
+                "model", aiProperties.gpt().model(),
                 "temperature", 0.7,
                 "messages", List.of(
                         Map.of("role", "system", "content", SYSTEM_PROMPT),
@@ -110,7 +121,7 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
                 )
         );
 
-        String chatUrl = aiProperties.openai().baseUrl() + "/chat/completions";
+        String chatUrl = aiProperties.baseUrl() + "/chat/completions";
 
         var response = restClient.post()
                 .uri(chatUrl)
@@ -178,6 +189,23 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
         return objectMapper.readValue(json, GptFeedback.class);
     }
 
+    private String summarizeException(Exception exception) {
+        if (exception instanceof RestClientResponseException restException) {
+            String body = restException.getResponseBodyAsString();
+            if (body != null && !body.isBlank()) {
+                return truncate(body.replaceAll("\\s+", " ").trim(), 220);
+            }
+        }
+        return truncate(exception.getMessage(), 220);
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength - 3) + "...";
+    }
+
     private List<FeedbackNote> combineFeedbackNotes(
             List<FillerWordOccurrence> fillerWords,
             List<PauseOccurrence> pauses,
@@ -218,41 +246,6 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
         }
 
         return notes;
-    }
-
-    private AnalysisResult buildLocalFallback(
-            Metrics metrics,
-            List<FillerWordOccurrence> fillerWords,
-            List<PauseOccurrence> pauses,
-            String sessionType
-    ) {
-        List<FeedbackNote> notes = new ArrayList<>();
-        for (var filler : fillerWords) {
-            notes.add(new FeedbackNote("filler", "warning",
-                    "Filler word: \"" + filler.word() + "\"", filler.timestampSeconds(), null));
-        }
-        for (var pause : pauses) {
-            if ("awkward".equals(pause.type())) {
-                notes.add(new FeedbackNote("pacing", "warning",
-                        String.format("Long pause (%.1fs)", pause.durationSeconds()),
-                        pause.startSeconds(), pause.endSeconds()));
-            }
-        }
-
-        String summary = String.format("This %s had %d words at %d WPM with %d filler words.",
-                sessionType, metrics.totalWords(), metrics.wordsPerMinute(), metrics.fillerWordCount());
-
-        List<String> strengths = new ArrayList<>();
-        if (metrics.wordsPerMinute() >= 120 && metrics.wordsPerMinute() <= 150) strengths.add("Good speaking pace");
-        if (metrics.fillerWordCount() <= 3) strengths.add("Minimal filler words");
-        if (strengths.isEmpty()) strengths.add("Completed the session");
-
-        List<String> improvements = new ArrayList<>();
-        if (metrics.fillerWordCount() > 5) improvements.add("Reduce filler words");
-        if (metrics.wordsPerMinute() > 170) improvements.add("Slow down for clarity");
-        if (metrics.wordsPerMinute() < 100) improvements.add("Speed up to maintain engagement");
-
-        return new AnalysisResult(metrics, notes, summary, strengths, improvements);
     }
 
     // --- Local metric calculations (same as MockSpeechAnalysisService) ---

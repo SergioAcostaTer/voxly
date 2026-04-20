@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -28,7 +29,7 @@ public class OpenAiTranscriptionService implements TranscriptionService {
     public OpenAiTranscriptionService(AiProperties aiProperties) {
         this.aiProperties = aiProperties;
         this.restClient = RestClient.builder()
-                .defaultHeader("Authorization", "Bearer " + aiProperties.openai().apiKey())
+                .defaultHeader("Authorization", "Bearer " + aiProperties.apiKey())
                 .build();
     }
 
@@ -37,16 +38,23 @@ public class OpenAiTranscriptionService implements TranscriptionService {
         log.info("Starting Whisper transcription for: {}", filePath.getFileName());
 
         try {
+            if (aiProperties.apiKey() == null || aiProperties.apiKey().isBlank()) {
+                return ResultT.failure(Error.failure(
+                        "Transcription.OpenAiNotConfigured",
+                        "OPENAI_API_KEY is not configured"
+                ));
+            }
+
             var bodyBuilder = new MultipartBodyBuilder();
             bodyBuilder.part("file", new FileSystemResource(filePath));
-            bodyBuilder.part("model", aiProperties.openai().whisperModel());
+            bodyBuilder.part("model", aiProperties.whisper().model());
             bodyBuilder.part("response_format", "verbose_json");
             bodyBuilder.part("timestamp_granularities[]", "segment");
             if (language != null) {
                 bodyBuilder.part("language", language);
             }
 
-            String whisperUrl = aiProperties.openai().baseUrl() + "/audio/transcriptions";
+            String whisperUrl = aiProperties.baseUrl() + "/audio/transcriptions";
 
             var response = restClient.post()
                     .uri(whisperUrl)
@@ -86,8 +94,25 @@ public class OpenAiTranscriptionService implements TranscriptionService {
         } catch (Exception e) {
             log.error("Whisper transcription failed for: {}", filePath.getFileName(), e);
             return ResultT.failure(Error.failure("Transcription.Failed",
-                    "Whisper transcription failed: " + e.getMessage()));
+                    "Whisper transcription failed: " + summarizeException(e)));
         }
+    }
+
+    private String summarizeException(Exception exception) {
+        if (exception instanceof RestClientResponseException restException) {
+            String body = restException.getResponseBodyAsString();
+            if (body != null && !body.isBlank()) {
+                return truncate(body.replaceAll("\\s+", " ").trim(), 220);
+            }
+        }
+        return truncate(exception.getMessage(), 220);
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength - 3) + "...";
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

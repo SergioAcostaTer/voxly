@@ -35,6 +35,20 @@ public class SessionController {
         return ResultMapper.toCreatedResponse(sessionService.createSession(request));
     }
 
+    @PostMapping(value = "/with-media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Create a new practice session and upload media atomically")
+    public ResponseEntity<ApiResponse<SessionResponse>> createSessionWithMedia(
+            @RequestParam("title") String title,
+            @RequestParam("sessionType") String sessionType,
+            @RequestParam("language") String language,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam("file") MultipartFile file
+    ) {
+        return ResultMapper.toCreatedResponse(sessionService.createSessionWithMedia(
+                new CreateSessionRequest(title, description, sessionType, language),
+                file));
+    }
+
     @GetMapping
     @Operation(summary = "Get all sessions for the current user")
     public ResponseEntity<ApiResponse<SessionListResponse>> getUserSessions(

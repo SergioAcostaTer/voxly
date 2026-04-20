@@ -8,9 +8,7 @@ import {
 import { ApiClientError, api } from '../lib/api'
 import type { LoginPayload, RegisterPayload, User } from '../types/auth'
 import { AuthContext, type AuthContextValue } from './auth-context'
-
-const AUTH_BYPASS_ENABLED = import.meta.env.VITE_AUTH_BYPASS === 'true'
-const TESTING_ACCESS_TOKEN = 'testing-bypass'
+import { AUTH_BYPASS_ENABLED, TESTING_ACCESS_TOKEN, TESTING_USER } from './testing-auth'
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<User | null>(null)
@@ -39,8 +37,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setAccessToken(TESTING_ACCESS_TOKEN)
         setUser(profile)
       } catch {
-        setAccessToken(null)
-        setUser(null)
+        setAccessToken(TESTING_ACCESS_TOKEN)
+        setUser(TESTING_USER)
       }
       return
     }
@@ -67,8 +65,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setAccessToken(TESTING_ACCESS_TOKEN)
         setUser(profile)
       } catch {
-        setAccessToken(null)
-        setUser(null)
+        setAccessToken(TESTING_ACCESS_TOKEN)
+        setUser(TESTING_USER)
       } finally {
         setIsLoading(false)
       }
@@ -95,9 +93,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const login = useCallback(async (payload: LoginPayload) => {
     if (AUTH_BYPASS_ENABLED) {
-      const profile = await api.me(TESTING_ACCESS_TOKEN)
-      setAccessToken(TESTING_ACCESS_TOKEN)
-      setUser(profile)
+      try {
+        const profile = await api.me(TESTING_ACCESS_TOKEN)
+        setAccessToken(TESTING_ACCESS_TOKEN)
+        setUser(profile)
+      } catch {
+        setAccessToken(TESTING_ACCESS_TOKEN)
+        setUser(TESTING_USER)
+      }
       return
     }
 
@@ -123,6 +126,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const register = useCallback(async (payload: RegisterPayload) => {
     if (AUTH_BYPASS_ENABLED) {
+      setAccessToken(TESTING_ACCESS_TOKEN)
+      setUser(TESTING_USER)
       return
     }
 
@@ -131,6 +136,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const logout = useCallback(async () => {
     if (AUTH_BYPASS_ENABLED) {
+      setAccessToken(TESTING_ACCESS_TOKEN)
+      setUser(TESTING_USER)
       return
     }
 

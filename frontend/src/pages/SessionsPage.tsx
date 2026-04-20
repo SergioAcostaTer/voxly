@@ -10,13 +10,14 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { AUTH_BYPASS_ENABLED } from '../auth/testing-auth'
 import { useAuth } from '../auth/useAuth'
+import { AppHeader } from '../components/AppHeader'
 import { api, ApiClientError } from '../lib/api'
 import { cn } from '../lib/cn'
 import type { Session, SessionStatus } from '../types/sessions'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
-import { Logo } from '../ui/Logo'
 
 const statusConfig: Record<SessionStatus, { icon: typeof Clock; color: string; label: string }> = {
   draft: { icon: Clock, color: 'text-muted-foreground', label: 'Draft' },
@@ -41,6 +42,10 @@ export function SessionsPage() {
       setSessions(response.sessions)
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
+        if (AUTH_BYPASS_ENABLED) {
+          setError('Testing mode is active but the backend did not accept the test user request.')
+          return
+        }
         await logout()
         navigate('/login', { replace: true })
         return
@@ -84,19 +89,9 @@ export function SessionsPage() {
   }
 
   return (
-    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:py-12">
-      <div className="mx-auto w-full max-w-5xl space-y-6">
-        <header className="flex items-center justify-between rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-panel backdrop-blur-sm">
-          <Logo />
-          <nav className="flex items-center gap-2">
-            <Link to="/dashboard">
-              <Button variant="ghost">Dashboard</Button>
-            </Link>
-            <Link to="/progress">
-              <Button variant="ghost">Progress</Button>
-            </Link>
-          </nav>
-        </header>
+    <div className="px-4 pb-6 pt-28 sm:px-6 sm:pb-8 lg:px-8 lg:pb-12">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <AppHeader />
 
         <div className="flex items-center justify-between">
           <div>
