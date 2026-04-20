@@ -1,5 +1,7 @@
 package com.pigs.voxly.infrastructure.sessions.persistence.mapper;
 
+import org.springframework.stereotype.Component;
+
 import com.pigs.voxly.domain.identity.UserId;
 import com.pigs.voxly.domain.sessions.Session;
 import com.pigs.voxly.domain.sessions.SessionId;
@@ -8,7 +10,6 @@ import com.pigs.voxly.domain.sessions.enumerations.SessionType;
 import com.pigs.voxly.domain.sessions.valueobjects.MediaFile;
 import com.pigs.voxly.domain.sessions.valueobjects.SessionTitle;
 import com.pigs.voxly.infrastructure.sessions.persistence.entity.SessionJpaEntity;
-import org.springframework.stereotype.Component;
 
 @Component
 public class SessionMapper {
@@ -21,8 +22,7 @@ public class SessionMapper {
                     entity.getMediaOriginalFilename(),
                     entity.getMediaContentType(),
                     entity.getMediaSizeBytes() != null ? entity.getMediaSizeBytes() : 0,
-                    entity.getMediaDurationSeconds()
-            );
+                    entity.getMediaDurationSeconds());
         }
 
         return Session.reconstitute(
@@ -33,10 +33,10 @@ public class SessionMapper {
                 SessionType.fromName(entity.getSessionType()),
                 SessionStatus.fromName(entity.getStatus()),
                 mediaFile,
+                entity.getLanguage(),
                 entity.getCreatedAt(),
                 entity.getModifiedAt(),
-                entity.getEvaluationId()
-        );
+                entity.getEvaluationId());
     }
 
     public SessionJpaEntity toEntity(Session session) {
@@ -47,6 +47,7 @@ public class SessionMapper {
         entity.setDescription(session.getDescription());
         entity.setSessionType(session.getSessionType().getName());
         entity.setStatus(session.getStatus().getName());
+        entity.setLanguage(session.getLanguage());
 
         if (session.getMediaFile() != null) {
             entity.setMediaStoragePath(session.getMediaFile().getStoragePath());

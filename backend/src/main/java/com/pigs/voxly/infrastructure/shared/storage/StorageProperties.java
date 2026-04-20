@@ -7,12 +7,15 @@ public record StorageProperties(
         String type,
         String localPath,
         String baseUrl,
-        long maxFileSizeBytes
-) {
+        long maxFileSizeBytes) {
     public StorageProperties {
-        if (type == null) type = "local";
-        if (localPath == null) localPath = "./uploads";
-        if (baseUrl == null) baseUrl = "/api/v1/files";
-        if (maxFileSizeBytes == 0) maxFileSizeBytes = 104857600L; // 100MB default
+        if (type == null)
+            type = "s3";
+        if (localPath == null)
+            localPath = "./uploads";
+        if (baseUrl == null)
+            baseUrl = "/api/v1/files";
+        if (maxFileSizeBytes == 0)
+            maxFileSizeBytes = 104857600L; // 100MB default
     }
 }

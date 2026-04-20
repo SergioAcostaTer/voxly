@@ -1,11 +1,11 @@
 package com.pigs.voxly.application.shared.ports;
 
-import com.pigs.voxly.sharedKernel.domain.results.Result;
-import com.pigs.voxly.sharedKernel.domain.results.ResultT;
-
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.Optional;
+
+import com.pigs.voxly.sharedKernel.domain.results.Result;
+import com.pigs.voxly.sharedKernel.domain.results.ResultT;
 
 /**
  * Port interface for file storage operations.
@@ -63,4 +63,13 @@ public interface StorageService {
      * @return the public URL or local path
      */
     String getPublicUrl(String storagePath);
+
+    /**
+     * Cleans up temporary files created during processing (if any).
+     * Cloud-backed storage implementations can download objects to temp files
+     * and remove them after transcription/analysis completes.
+     */
+    default void cleanupTemporaryFile(Path filePath) {
+        // No-op by default.
+    }
 }

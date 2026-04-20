@@ -1,17 +1,17 @@
 import {
-  AlertCircle,
-  ArrowLeft,
-  CheckCircle,
-  Clock,
-  Gauge,
-  Loader2,
-  MessageSquare,
-  Mic2,
-  RefreshCw,
-  Timer,
-  Video,
+    AlertCircle,
+    ArrowLeft,
+    CheckCircle,
+    Clock,
+    Gauge,
+    Loader2,
+    MessageSquare,
+    Mic2,
+    RefreshCw,
+    Timer,
+    Video,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { api, ApiClientError } from '../lib/api'
@@ -30,11 +30,72 @@ const severityColors = {
   suggestion: 'bg-green-100 text-green-700 border-green-200',
 }
 
+type ProcessingState = {
+  label: string
+  description: string
+  spinner: boolean
+  tone: 'neutral' | 'accent' | 'success' | 'danger'
+}
+
+function getProcessingState(session: Session, evaluation: Evaluation | null): ProcessingState {
+  if (session.status === 'failed' || evaluation?.status === 'failed') {
+    return {
+      label: 'Processing failed',
+      description: evaluation?.errorMessage ?? 'Something went wrong while processing this session.',
+      spinner: false,
+      tone: 'danger',
+    }
+  }
+
+  if (evaluation?.status === 'transcribing') {
+    return {
+      label: 'Transcribing audio',
+      description: 'The video is being converted into text. You can safely refresh or come back later.',
+      spinner: true,
+      tone: 'accent',
+    }
+  }
+
+  if (evaluation?.status === 'analyzing' || session.status === 'analyzing') {
+    return {
+      label: 'Analyzing presentation',
+      description: 'The transcript is ready and the analysis engine is generating feedback.',
+      spinner: true,
+      tone: 'accent',
+    }
+  }
+
+  if (evaluation?.status === 'pending' || session.status === 'uploaded') {
+    return {
+      label: 'Queued for processing',
+      description: 'The session is uploaded and waiting for the async pipeline to pick it up.',
+      spinner: true,
+      tone: 'neutral',
+    }
+  }
+
+  if (evaluation?.status === 'completed' || session.status === 'completed') {
+    return {
+      label: 'Processing complete',
+      description: 'Transcript and feedback are ready below.',
+      spinner: false,
+      tone: 'success',
+    }
+  }
+
+  return {
+    label: 'Draft session',
+    description: 'Upload media to start the analysis pipeline.',
+    spinner: false,
+    tone: 'neutral',
+  }
+}
+
 export function SessionDetailPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
   const { accessToken, logout } = useAuth()
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const mediaRef = useRef<HTMLMediaElement>(null)
 
   const [session, setSession] = useState<Session | null>(null)
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null)
@@ -43,15 +104,18 @@ export function SessionDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null)
+  const [isLivePolling, setIsLivePolling] = useState(false)
 
   const fetchData = useCallback(async () => {
     if (!accessToken || !sessionId) return
 
     try {
+      setError(null)
       const sessionData = await api.getSession(accessToken, sessionId)
       setSession(sessionData)
 
-      if (sessionData.evaluationId || sessionData.status === 'completed' || sessionData.status === 'analyzing') {
+      if (sessionData.evaluationId || sessionData.status !== 'draft') {
         try {
           const evalData = await api.getEvaluation(accessToken, sessionId)
           setEvaluation(evalData)
@@ -59,11 +123,25 @@ export function SessionDetailPage() {
           if (evalData.status === 'completed') {
             const feedbackData = await api.getFeedback(accessToken, sessionId)
             setFeedback(feedbackData)
+          } else {
+            setFeedback(null)
           }
-        } catch {
-          // Evaluation might not exist yet
+        } catch (evaluationError) {
+          if (evaluationError instanceof ApiClientError && evaluationError.status === 404) {
+            setEvaluation(null)
+            setFeedback(null)
+          } else if (evaluationError instanceof ApiClientError && evaluationError.status === 401) {
+            await logout()
+            navigate('/login', { replace: true })
+            return
+          }
         }
+      } else {
+        setEvaluation(null)
+        setFeedback(null)
       }
+
+      setLastSyncedAt(new Date())
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
         await logout()
@@ -78,6 +156,7 @@ export function SessionDetailPage() {
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
+      setIsLivePolling(false)
     }
   }, [accessToken, sessionId, logout, navigate])
 
@@ -85,13 +164,36 @@ export function SessionDetailPage() {
     fetchData()
   }, [fetchData])
 
-  // Auto-refresh while analyzing
-  useEffect(() => {
-    if (session?.status === 'analyzing' || evaluation?.status === 'transcribing' || evaluation?.status === 'analyzing') {
-      const interval = setInterval(fetchData, 5000)
-      return () => clearInterval(interval)
+  const processingState = useMemo(() => {
+    if (!session) {
+      return null
     }
-  }, [session?.status, evaluation?.status, fetchData])
+
+    return getProcessingState(session, evaluation)
+  }, [session, evaluation])
+
+  const shouldPoll = Boolean(
+    session && (
+      session.status === 'uploaded' ||
+      session.status === 'analyzing' ||
+      evaluation?.status === 'pending' ||
+      evaluation?.status === 'transcribing' ||
+      evaluation?.status === 'analyzing'
+    ),
+  )
+
+  useEffect(() => {
+    if (!shouldPoll) {
+      return
+    }
+
+    setIsLivePolling(true)
+    const interval = setInterval(() => {
+      void fetchData()
+    }, 3500)
+
+    return () => clearInterval(interval)
+  }, [shouldPoll, fetchData])
 
   function handleRefresh() {
     setIsRefreshing(true)
@@ -99,9 +201,9 @@ export function SessionDetailPage() {
   }
 
   function seekToTimestamp(seconds: number) {
-    if (videoRef.current) {
-      videoRef.current.currentTime = seconds
-      videoRef.current.play()
+    if (mediaRef.current) {
+      mediaRef.current.currentTime = seconds
+      void mediaRef.current.play()
     }
   }
 
@@ -152,7 +254,9 @@ export function SessionDetailPage() {
   }
 
   const isAnalyzing = session.status === 'analyzing' || evaluation?.status === 'transcribing' || evaluation?.status === 'analyzing'
-  const videoUrl = session.mediaFile ? `${API_BASE_URL}${session.mediaFile.url}` : null
+  const isProcessing = session.status === 'uploaded' || isAnalyzing || evaluation?.status === 'pending'
+  const mediaUrl = session.mediaFile ? `${API_BASE_URL}${session.mediaFile.url}` : null
+  const isAudioMedia = session.mediaFile?.contentType.startsWith('audio/') ?? false
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 lg:py-12">
@@ -189,12 +293,17 @@ export function SessionDetailPage() {
               <p className="mt-2 text-sm text-primary-foreground/80">
                 Created {formatDate(session.createdAt)}
               </p>
+              {lastSyncedAt && (
+                <p className="mt-1 text-xs text-primary-foreground/70">
+                  Last synced {lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
-              {isAnalyzing && (
+              {isLivePolling && (
                 <span className="flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-sm">
                   <Loader2 className="animate-spin" size={14} />
-                  Analyzing...
+                  Live sync
                 </span>
               )}
               {session.status === 'completed' && (
@@ -215,6 +324,64 @@ export function SessionDetailPage() {
           </div>
         </Card>
 
+        {/* Live Processing Status */}
+        {processingState && (
+          <Card
+            className={cn(
+              processingState.tone === 'danger' && 'border-red-200 bg-red-50',
+              processingState.tone === 'success' && 'border-emerald-200 bg-emerald-50',
+              processingState.tone === 'accent' && 'border-cyan-200 bg-cyan-50',
+            )}
+          >
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-4">
+                <div className={cn(
+                  'flex h-12 w-12 items-center justify-center rounded-2xl',
+                  processingState.tone === 'danger' && 'bg-red-100 text-red-600',
+                  processingState.tone === 'success' && 'bg-emerald-100 text-emerald-600',
+                  processingState.tone === 'accent' && 'bg-cyan-100 text-cyan-600',
+                  processingState.tone === 'neutral' && 'bg-muted text-muted-foreground',
+                )}>
+                  {processingState.spinner ? <Loader2 className="animate-spin" size={22} /> : <CheckCircle size={22} />}
+                </div>
+                <div>
+                  <h2 className="display-font text-lg font-semibold text-foreground">
+                    {processingState.label}
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {processingState.description}
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-2 text-sm text-muted-foreground md:text-right">
+                <span>Session status: {session.status}</span>
+                <span>Evaluation status: {evaluation?.status ?? 'not created yet'}</span>
+                <span>Reload-safe: yes, progress is saved server-side</span>
+              </div>
+            </div>
+
+            {isProcessing && (
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl bg-white/70 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Step 1</p>
+                  <p className="mt-1 font-semibold text-foreground">Upload stored</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Media is saved in S3/R2 and linked to the session.</p>
+                </div>
+                <div className="rounded-xl bg-white/70 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Step 2</p>
+                  <p className="mt-1 font-semibold text-foreground">Transcription</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Whisper runs detached; this page keeps syncing status.</p>
+                </div>
+                <div className="rounded-xl bg-white/70 p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Step 3</p>
+                  <p className="mt-1 font-semibold text-foreground">Analysis</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Feedback is generated and saved so you can refresh safely.</p>
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
+
         {/* Analyzing State */}
         {isAnalyzing && (
           <Card>
@@ -230,22 +397,38 @@ export function SessionDetailPage() {
           </Card>
         )}
 
-        {/* Video Player */}
-        {videoUrl && (
+        {/* Media Player */}
+        {mediaUrl && (
           <Card>
             <h2 className="display-font mb-4 text-lg font-semibold text-foreground">
-              <Video className="mr-2 inline-block" size={20} />
-              Recording
+              {isAudioMedia ? <Mic2 className="mr-2 inline-block" size={20} /> : <Video className="mr-2 inline-block" size={20} />}
+              {isAudioMedia ? 'Audio recording' : 'Recording'}
             </h2>
-            <video
-              ref={videoRef}
-              src={videoUrl}
-              controls
-              className="w-full rounded-xl bg-black"
-              preload="metadata"
-            >
-              Your browser does not support video playback.
-            </video>
+            {isAudioMedia ? (
+              <audio
+                ref={(node) => {
+                  mediaRef.current = node
+                }}
+                src={mediaUrl}
+                controls
+                className="w-full"
+                preload="metadata"
+              >
+                Your browser does not support audio playback.
+              </audio>
+            ) : (
+              <video
+                ref={(node) => {
+                  mediaRef.current = node
+                }}
+                src={mediaUrl}
+                controls
+                className="w-full rounded-xl bg-black"
+                preload="metadata"
+              >
+                Your browser does not support video playback.
+              </video>
+            )}
             {session.mediaFile && (
               <p className="mt-2 text-xs text-muted-foreground">
                 {session.mediaFile.originalFileName}
@@ -254,6 +437,20 @@ export function SessionDetailPage() {
                 )}
               </p>
             )}
+          </Card>
+        )}
+
+        {evaluation?.status !== 'completed' && session.mediaFile && (
+          <Card className="border-dashed border-border bg-muted/20">
+            <div className="flex items-start gap-3">
+              <Loader2 className={cn('mt-0.5 shrink-0 text-primary', isProcessing && 'animate-spin')} size={18} />
+              <div>
+                <h2 className="font-semibold text-foreground">Processing in progress</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  You can reload this page at any time. The backend will recover pending work and this view will continue polling until the result is ready.
+                </p>
+              </div>
+            </div>
           </Card>
         )}
 

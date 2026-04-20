@@ -1,5 +1,6 @@
 export type SessionType = 'presentation' | 'interview' | 'pitch' | 'freestyle'
 export type SessionStatus = 'draft' | 'uploaded' | 'analyzing' | 'completed' | 'failed'
+export type SupportedLanguage = 'en' | 'es'
 
 export type MediaFile = {
   storagePath: string
@@ -19,6 +20,7 @@ export type Session = {
   status: SessionStatus
   mediaFile: MediaFile | null
   evaluationId: string | null
+  language: SupportedLanguage
   createdAt: string
   modifiedAt: string
 }
@@ -27,6 +29,7 @@ export type CreateSessionRequest = {
   title: string
   sessionType: string
   description?: string
+  language: SupportedLanguage
 }
 
 export type SessionListResponse = {

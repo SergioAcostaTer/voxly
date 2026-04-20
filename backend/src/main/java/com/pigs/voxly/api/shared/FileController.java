@@ -1,16 +1,19 @@
 package com.pigs.voxly.api.shared;
 
-import com.pigs.voxly.application.shared.ports.StorageService;
-import org.springframework.core.io.FileSystemResource;
+import java.io.InputStream;
+import java.net.URLConnection;
+
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URLConnection;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import com.pigs.voxly.application.shared.ports.StorageService;
 
 @RestController
 @RequestMapping("/api/v1/files")
@@ -25,8 +28,7 @@ public class FileController {
     @GetMapping("/{directory}/{filename}")
     public ResponseEntity<Resource> serveFile(
             @PathVariable String directory,
-            @PathVariable String filename
-    ) {
+            @PathVariable String filename) {
         return serve(directory + "/" + filename, filename);
     }
 
@@ -34,20 +36,19 @@ public class FileController {
     public ResponseEntity<Resource> serveNestedFile(
             @PathVariable String directory,
             @PathVariable String subdirectory,
-            @PathVariable String filename
-    ) {
+            @PathVariable String filename) {
         return serve(directory + "/" + subdirectory + "/" + filename, filename);
     }
 
     private ResponseEntity<Resource> serve(String storagePath, String filename) {
-        Path filePath = storageService.getAbsolutePath(storagePath);
-
-        if (!Files.exists(filePath)) {
+        var fileStreamOpt = storageService.retrieve(storagePath);
+        if (fileStreamOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         String contentType = guessContentType(filename);
-        Resource resource = new FileSystemResource(filePath);
+        InputStream inputStream = fileStreamOpt.get();
+        Resource resource = new InputStreamResource(inputStream);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")

@@ -1,13 +1,16 @@
 package com.pigs.voxly.infrastructure.evaluation.persistence.repository;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.stereotype.Repository;
+
 import com.pigs.voxly.domain.evaluation.Evaluation;
 import com.pigs.voxly.domain.evaluation.EvaluationId;
 import com.pigs.voxly.domain.evaluation.EvaluationRepository;
+import com.pigs.voxly.domain.evaluation.enumerations.EvaluationStatus;
 import com.pigs.voxly.domain.sessions.SessionId;
 import com.pigs.voxly.infrastructure.evaluation.persistence.mapper.EvaluationMapper;
-import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
 
 @Repository
 public class JpaEvaluationRepository implements EvaluationRepository {
@@ -30,6 +33,14 @@ public class JpaEvaluationRepository implements EvaluationRepository {
     public Optional<Evaluation> findBySessionId(SessionId sessionId) {
         return springDataRepository.findBySessionId(sessionId.getValue())
                 .map(mapper::toDomain);
+    }
+
+    @Override
+    public List<Evaluation> findByStatuses(List<EvaluationStatus> statuses) {
+        List<String> names = statuses.stream().map(EvaluationStatus::getName).toList();
+        return springDataRepository.findByStatusIn(names).stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     @Override

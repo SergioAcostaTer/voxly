@@ -1,13 +1,40 @@
 spring:
+  application:
+    name: VoxLy
+  output:
+    ansi:
+      enabled: ALWAYS
+  main:
+    banner-mode: console
+
   datasource:
     url: ${DATABASE_URL}
     username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
+    driver-class-name: ${DATABASE_DRIVER:org.postgresql.Driver}
 
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: validate
+    open-in-view: false
     show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 4
+    baseline-description: legacy-hibernate-schema
+    clean-disabled: true
+
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
 
   mail:
     host: ${SMTP_HOST}
@@ -17,12 +44,49 @@ spring:
     properties:
       mail:
         smtp:
-          auth: true
+          auth: ${MAIL_AUTH_ENABLED:true}
           starttls:
-            enable: true
+            enable: ${MAIL_STARTTLS_ENABLED:true}
+
+cloudflare:
+  r2:
+    endpoint: ${CLOUDFLARE_R2_ENDPOINT}
+    region: ${CLOUDFLARE_R2_REGION:auto}
+    accessKeyId: ${CLOUDFLARE_R2_ACCESS_KEY_ID}
+    accessKeySecret: ${CLOUDFLARE_R2_ACCESS_KEY_SECRET}
+    bucketName: ${CLOUDFLARE_R2_BUCKET_NAME:voxly-sessions}
+    publicUrl: ${CLOUDFLARE_R2_PUBLIC_URL}
+
+openai:
+  apiKey: ${OPENAI_API_KEY}
+  whisper:
+    model: ${OPENAI_WHISPER_MODEL:whisper-1}
+    supportedLanguages: ${OPENAI_SUPPORTED_LANGUAGES:en,es}
+    defaultLanguage: ${OPENAI_DEFAULT_LANGUAGE:en}
+  gpt:
+    model: ${OPENAI_GPT_MODEL:gpt-3.5-turbo}
+    maxTokens: ${OPENAI_GPT_MAX_TOKENS:1500}
+    temperature: ${OPENAI_GPT_TEMPERATURE:0.7}
+
+storage:
+  temp-dir: ${STORAGE_TEMP_DIR:/tmp/voxly-temp}
+  max-upload-size: ${MAX_FILE_SIZE_BYTES:104857600}
+  allowed-video-types: video/mp4,video/quicktime,video/x-msvideo,video/webm
+  allowed-slide-types: application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation
+  ffmpeg:
+    path: ${FFMPEG_PATH:ffmpeg}
+    audio-format: ${FFMPEG_AUDIO_FORMAT:wav}
+    audio-bitrate: ${FFMPEG_AUDIO_BITRATE:128k}
+    audio-samplerate: ${FFMPEG_AUDIO_SAMPLERATE:16000}
+
+notification:
+  email:
+    from: ${SMTP_FROM_EMAIL:noreply@voxly.app}
+    admin: ${ADMIN_EMAIL:admin@voxly.app}
+  base-url: ${APP_BASE_URL}
 
 server:
-  port: ${PORT:8080}
+  port: ${SERVER_PORT:8080}
 
 springdoc:
   api-docs:
@@ -33,15 +97,16 @@ springdoc:
 app:
   jwt:
     secret-key: ${JWT_SECRET_KEY}
-    access-cookie-secure: true
+    issuer: ${JWT_ISSUER:VoxLy}
+    audience: ${JWT_AUDIENCE:VoxLy}
+    access-token-expiry-minutes: ${JWT_ACCESS_TOKEN_EXPIRY_MINUTES:15}
+    refresh-token-expiry-days: ${JWT_REFRESH_TOKEN_EXPIRY_DAYS:7}
+    access-cookie-secure: ${JWT_ACCESS_COOKIE_SECURE:true}
   mail:
-    base-url: ${APP_BASE_URL:https://voxly.com}
+    from-email: ${SMTP_FROM_EMAIL:noreply@voxly.com}
+    from-name: ${APP_NAME:VoxLy}
+    base-url: ${APP_BASE_URL}
   storage:
-    type: ${STORAGE_TYPE:local}
-    local-path: ${STORAGE_PATH:/data/uploads}
-    base-url: ${STORAGE_BASE_URL:/api/v1/files}
-    max-file-size-bytes: ${MAX_FILE_SIZE:104857600}
-  ai:
-    provider: ${AI_PROVIDER:openai}
-    openai:
-      api-key: ${OPENAI_API_KEY}
+    type: ${STORAGE_TYPE:s3}
+    base-url: ${STORAGE_BASE_URL}
+    max-file-size-bytes: ${MAX_FILE_SIZE_BYTES:104857600}

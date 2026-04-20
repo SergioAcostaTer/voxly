@@ -38,7 +38,23 @@ type RequestOptions = {
   accessToken?: string | null
 }
 
-async function request<T>(path: string, options: RequestOptions = {}) {
+type UploadProgressCallback = (percent: number) => void
+
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504])
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function safeParseJson<T>(response: Response): Promise<ApiResponse<T> | null> {
+  try {
+    return (await response.json()) as ApiResponse<T>
+  } catch {
+    return null
+  }
+}
+
+async function request<T>(path: string, options: RequestOptions = {}, attempt = 0): Promise<T> {
   const headers = new Headers({
     'Content-Type': 'application/json',
   })
@@ -47,25 +63,46 @@ async function request<T>(path: string, options: RequestOptions = {}) {
     headers.set('Authorization', `Bearer ${options.accessToken}`)
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: options.method ?? 'GET',
-    credentials: 'include',
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  })
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method: options.method ?? 'GET',
+      credentials: 'include',
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    })
 
-  const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null
-  const firstError = payload?.errors?.[0]
+    const payload = await safeParseJson<T>(response)
+    const firstError = payload?.errors?.[0]
 
-  if (!response.ok || !payload?.success) {
-    throw new ApiClientError(
-      firstError?.message ?? `Request failed with status ${response.status}`,
-      response.status,
-      firstError?.code,
-    )
+    if (!response.ok || !payload?.success) {
+      const status = response.status
+      const error = new ApiClientError(
+        firstError?.message ?? `Request failed with status ${status}`,
+        status,
+        firstError?.code,
+      )
+
+      if (attempt < 2 && RETRYABLE_STATUSES.has(status) && options.method !== 'POST') {
+        await sleep(300 * (attempt + 1))
+        return request<T>(path, options, attempt + 1)
+      }
+
+      throw error
+    }
+
+    return payload.data as T
+  } catch (error) {
+    if (
+      attempt < 2 &&
+      options.method !== 'POST' &&
+      (!(error instanceof ApiClientError) || error.status === 0)
+    ) {
+      await sleep(300 * (attempt + 1))
+      return request<T>(path, options, attempt + 1)
+    }
+
+    throw error
   }
-
-  return payload.data as T
 }
 
 async function requestAuth<T>(suffixPath: string, options: RequestOptions = {}) {
@@ -152,31 +189,58 @@ export const api = {
     })
   },
 
-  async uploadSessionMedia(accessToken: string, sessionId: string, file: File) {
-    const formData = new FormData()
-    formData.append('file', file)
+  uploadSessionMedia(
+    accessToken: string,
+    sessionId: string,
+    file: File,
+    onProgress?: UploadProgressCallback,
+  ) {
+    return new Promise<Session>((resolve, reject) => {
+      const formData = new FormData()
+      formData.append('file', file)
 
-    const response = await fetch(`${API_BASE_URL}/v1/sessions/${sessionId}/media`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: formData,
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${API_BASE_URL}/v1/sessions/${sessionId}/media`)
+      xhr.withCredentials = true
+      xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable || !onProgress) return
+        const percent = Math.round((event.loaded / event.total) * 100)
+        onProgress(percent)
+      }
+
+      xhr.onerror = () => {
+        reject(new ApiClientError('Upload failed due to a network error.', 0))
+      }
+
+      xhr.onload = () => {
+        const status = xhr.status
+        const payload = (() => {
+          try {
+            return JSON.parse(xhr.responseText || 'null') as ApiResponse<Session> | null
+          } catch {
+            return null
+          }
+        })()
+        const firstError = payload?.errors?.[0]
+
+        if (status < 200 || status >= 300 || !payload?.success) {
+          reject(
+            new ApiClientError(
+              firstError?.message ?? `Upload failed with status ${status}`,
+              status,
+              firstError?.code,
+            ),
+          )
+          return
+        }
+
+        resolve(payload.data as Session)
+      }
+
+      xhr.send(formData)
     })
-
-    const payload = (await response.json().catch(() => null)) as ApiResponse<Session> | null
-
-    if (!response.ok || !payload?.success) {
-      const firstError = payload?.errors?.[0]
-      throw new ApiClientError(
-        firstError?.message ?? `Upload failed with status ${response.status}`,
-        response.status,
-        firstError?.code,
-      )
-    }
-
-    return payload.data as Session
   },
 
   requestAnalysis(accessToken: string, sessionId: string) {
@@ -189,6 +253,95 @@ export const api = {
   // Evaluation
   getEvaluation(accessToken: string, sessionId: string) {
     return request<Evaluation>(`/v1/evaluations/session/${sessionId}`, {
+      accessToken,
+    })
+  },
+
+  requestTranscription(accessToken: string, sessionId: string, file: File) {
+    return new Promise<{
+      id: string
+      status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+      originalText: string | null
+      durationSeconds: number | null
+      wordCount: number | null
+      language: string
+      errorMessage: string | null
+    }>((resolve, reject) => {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${API_BASE_URL}/v1/evaluations/${sessionId}/transcribe`)
+      xhr.withCredentials = true
+      xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+
+      xhr.onerror = () => {
+        reject(new ApiClientError('Transcription request failed due to a network error.', 0))
+      }
+
+      xhr.onload = () => {
+        const status = xhr.status
+        let payload: ApiResponse<{
+          id: string
+          status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+          originalText: string | null
+          durationSeconds: number | null
+          wordCount: number | null
+          language: string
+          errorMessage: string | null
+        }> | null = null
+
+        try {
+          payload = JSON.parse(xhr.responseText || 'null') as ApiResponse<{
+            id: string
+            status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+            originalText: string | null
+            durationSeconds: number | null
+            wordCount: number | null
+            language: string
+            errorMessage: string | null
+          }> | null
+        } catch {
+          payload = null
+        }
+        const firstError = payload?.errors?.[0]
+
+        if (status < 200 || status >= 300 || !payload?.success) {
+          reject(
+            new ApiClientError(
+              firstError?.message ?? `Transcription request failed with status ${status}`,
+              status,
+              firstError?.code,
+            ),
+          )
+          return
+        }
+
+        resolve(payload.data as {
+          id: string
+          status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+          originalText: string | null
+          durationSeconds: number | null
+          wordCount: number | null
+          language: string
+          errorMessage: string | null
+        })
+      }
+
+      xhr.send(formData)
+    })
+  },
+
+  getTranscription(accessToken: string, sessionId: string) {
+    return request<{
+      id: string
+      status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+      originalText: string | null
+      durationSeconds: number | null
+      wordCount: number | null
+      language: string
+      errorMessage: string | null
+    }>(`/v1/evaluations/${sessionId}/transcription`, {
       accessToken,
     })
   },

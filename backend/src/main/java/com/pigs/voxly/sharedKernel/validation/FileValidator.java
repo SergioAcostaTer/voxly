@@ -1,36 +1,49 @@
 package com.pigs.voxly.sharedKernel.validation;
 
-import com.pigs.voxly.sharedKernel.domain.results.Error;
-import com.pigs.voxly.sharedKernel.domain.results.Result;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+
+import com.pigs.voxly.sharedKernel.domain.results.Error;
+import com.pigs.voxly.sharedKernel.domain.results.Result;
 
 /**
  * Utility class for validating uploaded files.
  */
 public final class FileValidator {
 
-    private FileValidator() {}
+    private FileValidator() {
+    }
 
     private static final Set<String> ALLOWED_VIDEO_TYPES = Set.of(
-            "video/mp4"
-    );
+            "video/mp4");
 
     private static final Set<String> ALLOWED_VIDEO_EXTENSIONS = Set.of(
-            ".mp4"
-    );
+            ".mp4");
+
+    private static final Set<String> ALLOWED_AUDIO_TYPES = Set.of(
+            "audio/webm",
+            "audio/mp4",
+            "audio/mpeg",
+            "audio/wav",
+            "audio/x-wav",
+            "audio/ogg");
+
+    private static final Set<String> ALLOWED_AUDIO_EXTENSIONS = Set.of(
+            ".webm",
+            ".m4a",
+            ".mp4",
+            ".mp3",
+            ".wav",
+            ".ogg");
 
     private static final Set<String> ALLOWED_DOCUMENT_TYPES = Set.of(
             "application/pdf",
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "application/vnd.ms-powerpoint"
-    );
+            "application/vnd.ms-powerpoint");
 
     private static final Set<String> ALLOWED_DOCUMENT_EXTENSIONS = Set.of(
-            ".pdf", ".pptx", ".ppt"
-    );
+            ".pdf", ".pptx", ".ppt");
 
     private static final long DEFAULT_MAX_VIDEO_SIZE = 104857600L; // 100 MB
     private static final long DEFAULT_MAX_DOCUMENT_SIZE = 52428800L; // 50 MB
@@ -61,6 +74,49 @@ public final class FileValidator {
         if (contentType == null || !ALLOWED_VIDEO_TYPES.contains(contentType.toLowerCase())) {
             errors.add(Error.validation("File.InvalidVideoType",
                     "Invalid video content type. Allowed: " + ALLOWED_VIDEO_TYPES));
+        }
+
+        if (fileSize <= 0) {
+            errors.add(Error.validation("File.Empty", "File is empty"));
+        } else if (fileSize > maxSize) {
+            errors.add(Error.validation("File.TooLarge",
+                    String.format("File size (%d MB) exceeds maximum allowed (%d MB)",
+                            fileSize / 1048576, maxSize / 1048576)));
+        }
+
+        if (!errors.isEmpty()) {
+            return Result.failure(errors.toArray(new Error[0]));
+        }
+
+        return Result.success();
+    }
+
+    /**
+     * Validates an audio file.
+     */
+    public static Result validateAudio(String fileName, String contentType, long fileSize) {
+        return validateAudio(fileName, contentType, fileSize, DEFAULT_MAX_VIDEO_SIZE);
+    }
+
+    /**
+     * Validates an audio file with custom max size.
+     */
+    public static Result validateAudio(String fileName, String contentType, long fileSize, long maxSize) {
+        List<Error> errors = new ArrayList<>();
+
+        if (fileName == null || fileName.isBlank()) {
+            errors.add(Error.validation("File.NoName", "File name is required"));
+        } else {
+            String extension = getExtension(fileName).toLowerCase();
+            if (!ALLOWED_AUDIO_EXTENSIONS.contains(extension)) {
+                errors.add(Error.validation("File.InvalidAudioExtension",
+                        "Invalid audio file extension. Allowed: " + ALLOWED_AUDIO_EXTENSIONS));
+            }
+        }
+
+        if (contentType == null || !ALLOWED_AUDIO_TYPES.contains(contentType.toLowerCase())) {
+            errors.add(Error.validation("File.InvalidAudioType",
+                    "Invalid audio content type. Allowed: " + ALLOWED_AUDIO_TYPES));
         }
 
         if (fileSize <= 0) {
@@ -144,7 +200,8 @@ public final class FileValidator {
      * Gets the file extension including the dot.
      */
     public static String getExtension(String fileName) {
-        if (fileName == null) return "";
+        if (fileName == null)
+            return "";
         int dotIndex = fileName.lastIndexOf('.');
         return dotIndex >= 0 ? fileName.substring(dotIndex) : "";
     }
@@ -153,7 +210,8 @@ public final class FileValidator {
      * Gets the file name without extension.
      */
     public static String getNameWithoutExtension(String fileName) {
-        if (fileName == null) return "";
+        if (fileName == null)
+            return "";
         int dotIndex = fileName.lastIndexOf('.');
         return dotIndex >= 0 ? fileName.substring(0, dotIndex) : fileName;
     }
@@ -163,6 +221,13 @@ public final class FileValidator {
      */
     public static boolean isVideoContentType(String contentType) {
         return contentType != null && ALLOWED_VIDEO_TYPES.contains(contentType.toLowerCase());
+    }
+
+    /**
+     * Checks if the content type indicates an audio file.
+     */
+    public static boolean isAudioContentType(String contentType) {
+        return contentType != null && ALLOWED_AUDIO_TYPES.contains(contentType.toLowerCase());
     }
 
     /**

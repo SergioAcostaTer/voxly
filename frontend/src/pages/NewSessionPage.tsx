@@ -1,9 +1,9 @@
-import { AlertCircle, ArrowLeft, Loader2, Upload } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { AlertCircle, ArrowLeft, Loader2, Mic2, Square, Upload } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { api, ApiClientError } from '../lib/api'
-import type { SessionType } from '../types/sessions'
+import type { SessionType, SupportedLanguage } from '../types/sessions'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Input } from '../ui/Input'
@@ -17,7 +17,14 @@ const SESSION_TYPES: { value: SessionType; label: string; description: string }[
   { value: 'freestyle', label: 'Freestyle', description: 'Impromptu speaking practice' },
 ]
 
+const LANGUAGES: { value: SupportedLanguage; label: string }[] = [
+  { value: 'en', label: '🇬🇧 English' },
+  { value: 'es', label: '🇪🇸 Español (Spanish)' },
+]
+
 const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+const SUPPORTED_UPLOAD_TYPES = ['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4']
+const RECORDING_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
 
 export function NewSessionPage() {
   const navigate = useNavigate()
@@ -25,14 +32,29 @@ export function NewSessionPage() {
 
   const [title, setTitle] = useState('')
   const [type, setType] = useState<SessionType>('presentation')
+  const [language, setLanguage] = useState<SupportedLanguage>('en')
   const [file, setFile] = useState<File | null>(null)
   const [dragActive, setDragActive] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingPreviewUrl, setRecordingPreviewUrl] = useState<string | null>(null)
 
   const [step, setStep] = useState<'details' | 'upload' | 'processing'>('details')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordingChunksRef = useRef<BlobPart[]>([])
+
+  useEffect(() => {
+    return () => {
+      mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop())
+      if (recordingPreviewUrl) {
+        URL.revokeObjectURL(recordingPreviewUrl)
+      }
+    }
+  }, [recordingPreviewUrl])
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -50,23 +72,27 @@ export function NewSessionPage() {
     setDragActive(false)
 
     const droppedFile = e.dataTransfer.files[0]
-    if (droppedFile && droppedFile.type === 'video/mp4') {
+    if (droppedFile && SUPPORTED_UPLOAD_TYPES.includes(droppedFile.type)) {
       if (droppedFile.size > MAX_FILE_SIZE) {
         setError('File size must be under 100MB')
         return
       }
       setFile(droppedFile)
+      if (recordingPreviewUrl) {
+        URL.revokeObjectURL(recordingPreviewUrl)
+        setRecordingPreviewUrl(null)
+      }
       setError(null)
     } else {
-      setError('Please upload an MP4 video file')
+      setError('Please upload an audio or video file')
     }
-  }, [])
+  }, [recordingPreviewUrl])
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
-      if (selectedFile.type !== 'video/mp4') {
-        setError('Please upload an MP4 video file')
+      if (!SUPPORTED_UPLOAD_TYPES.includes(selectedFile.type)) {
+        setError('Please upload an audio or video file')
         return
       }
       if (selectedFile.size > MAX_FILE_SIZE) {
@@ -74,9 +100,86 @@ export function NewSessionPage() {
         return
       }
       setFile(selectedFile)
+      if (recordingPreviewUrl) {
+        URL.revokeObjectURL(recordingPreviewUrl)
+        setRecordingPreviewUrl(null)
+      }
       setError(null)
     }
+  }, [recordingPreviewUrl])
+
+  const stopRecording = useCallback(() => {
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop()
+    }
+
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+    mediaStreamRef.current = null
+    setIsRecording(false)
   }, [])
+
+  const startRecording = useCallback(async () => {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        setError('Audio recording is not supported in this browser.')
+        return
+      }
+
+      setError(null)
+      setFile(null)
+      if (recordingPreviewUrl) {
+        URL.revokeObjectURL(recordingPreviewUrl)
+        setRecordingPreviewUrl(null)
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaStreamRef.current = stream
+
+      const mimeType = RECORDING_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type))
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+
+      recordingChunksRef.current = []
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordingChunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        const extension = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('mpeg') ? 'mp3' : 'webm'
+        const recordedFile = new File(
+          [blob],
+          `voxly-audio-recording-${Date.now()}.${extension}`,
+          { type: blob.type || 'audio/webm' },
+        )
+
+        const previewUrl = URL.createObjectURL(blob)
+        setRecordingPreviewUrl(previewUrl)
+        setFile(recordedFile)
+        setError(null)
+      }
+
+      mediaRecorderRef.current = recorder
+      recorder.start()
+      setIsRecording(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to start audio recording')
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+      mediaStreamRef.current = null
+      setIsRecording(false)
+    }
+  }, [recordingPreviewUrl])
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      stopRecording()
+      return
+    }
+
+    void startRecording()
+  }, [isRecording, startRecording, stopRecording])
 
   async function handleCreateSession(e: React.FormEvent) {
     e.preventDefault()
@@ -86,7 +189,7 @@ export function NewSessionPage() {
     setError(null)
 
     try {
-      const session = await api.createSession(accessToken, { title: title.trim(), sessionType: type })
+      const session = await api.createSession(accessToken, { title: title.trim(), sessionType: type, language })
       setSessionId(session.id)
       setStep('upload')
     } catch (err) {
@@ -110,14 +213,7 @@ export function NewSessionPage() {
     setUploadProgress(0)
 
     try {
-      // Simulate upload progress (actual progress would need XMLHttpRequest)
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => Math.min(prev + 10, 90))
-      }, 200)
-
-      await api.uploadSessionMedia(accessToken, sessionId, file)
-
-      clearInterval(progressInterval)
+      await api.uploadSessionMedia(accessToken, sessionId, file, setUploadProgress)
       setUploadProgress(100)
 
       // Request analysis
@@ -162,13 +258,13 @@ export function NewSessionPage() {
           <div className="mb-6">
             <h1 className="display-font text-2xl font-semibold text-foreground">
               {step === 'details' && 'New Practice Session'}
-              {step === 'upload' && 'Upload Your Recording'}
+              {step === 'upload' && 'Record or Upload Your Audio'}
               {step === 'processing' && 'Processing...'}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {step === 'details' && 'Set up your practice session details'}
-              {step === 'upload' && 'Upload an MP4 video of your presentation'}
-              {step === 'processing' && 'Uploading and analyzing your presentation'}
+              {step === 'upload' && 'Record audio in your browser or upload an audio/video file'}
+              {step === 'processing' && 'Uploading and analyzing your recording'}
             </p>
           </div>
 
@@ -210,6 +306,22 @@ export function NewSessionPage() {
                 </p>
               </div>
 
+              <div>
+                <label className="mb-2 block text-sm font-medium text-foreground">
+                  Language
+                </label>
+                <Select value={language} onChange={(e) => setLanguage(e.target.value as SupportedLanguage)}>
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang.value} value={lang.value}>
+                      {lang.label}
+                    </option>
+                  ))}
+                </Select>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Choose the language you&apos;ll be speaking
+                </p>
+              </div>
+
               <Button type="submit" className="w-full" disabled={isSubmitting || !title.trim()}>
                 {isSubmitting ? (
                   <>
@@ -225,6 +337,56 @@ export function NewSessionPage() {
 
           {step === 'upload' && (
             <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={toggleRecording}
+                  disabled={isSubmitting}
+                  className="w-full"
+                >
+                  {isRecording ? (
+                    <>
+                      <Square size={18} />
+                      Stop Recording
+                    </>
+                  ) : (
+                    <>
+                      <Mic2 size={18} />
+                      Record Audio
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    stopRecording()
+                    setFile(null)
+                    if (recordingPreviewUrl) {
+                      URL.revokeObjectURL(recordingPreviewUrl)
+                      setRecordingPreviewUrl(null)
+                    }
+                    setError(null)
+                  }}
+                  disabled={isSubmitting && !isRecording}
+                  className="w-full"
+                >
+                  Clear Recording
+                </Button>
+              </div>
+
+              {recordingPreviewUrl && file && (
+                <Card className="border-primary/20 bg-primary/5">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Recorded audio ready</p>
+                    <audio controls src={recordingPreviewUrl} className="w-full" />
+                    <p className="text-xs text-muted-foreground">{file.name} · {formatFileSize(file.size)}</p>
+                  </div>
+                </Card>
+              )}
+
               <div
                 className={`relative rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
                   dragActive
@@ -240,7 +402,7 @@ export function NewSessionPage() {
               >
                 <input
                   type="file"
-                  accept="video/mp4"
+                  accept="audio/*,video/*"
                   onChange={handleFileSelect}
                   className="absolute inset-0 cursor-pointer opacity-0"
                 />
@@ -264,11 +426,9 @@ export function NewSessionPage() {
                   </div>
                 ) : (
                   <div>
-                    <p className="font-semibold text-foreground">
-                      Drag and drop your video here
-                    </p>
+                    <p className="font-semibold text-foreground">Drag and drop your audio here</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      or click to browse (MP4, max 100MB)
+                      or click to browse (audio or video, max 100MB)
                     </p>
                   </div>
                 )}
@@ -283,7 +443,7 @@ export function NewSessionPage() {
                 ) : (
                   <>
                     <Upload size={18} />
-                    Upload and Analyze
+                    Upload and Analyze Audio
                   </>
                 )}
               </Button>

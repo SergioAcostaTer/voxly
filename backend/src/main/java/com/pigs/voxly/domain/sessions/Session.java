@@ -1,19 +1,22 @@
 package com.pigs.voxly.domain.sessions;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 import com.pigs.voxly.domain.identity.UserId;
 import com.pigs.voxly.domain.sessions.enumerations.SessionStatus;
 import com.pigs.voxly.domain.sessions.enumerations.SessionType;
-import com.pigs.voxly.domain.sessions.events.*;
+import com.pigs.voxly.domain.sessions.events.SessionAnalysisRequestedEvent;
+import com.pigs.voxly.domain.sessions.events.SessionCreatedEvent;
+import com.pigs.voxly.domain.sessions.events.SessionDeletedEvent;
+import com.pigs.voxly.domain.sessions.events.SessionMediaUploadedEvent;
 import com.pigs.voxly.domain.sessions.valueobjects.MediaFile;
 import com.pigs.voxly.domain.sessions.valueobjects.SessionTitle;
 import com.pigs.voxly.sharedKernel.domain.ddd.AggregateRoot;
 import com.pigs.voxly.sharedKernel.domain.results.Result;
 import com.pigs.voxly.sharedKernel.domain.results.ResultT;
-
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
 public final class Session extends AggregateRoot<SessionId> {
 
@@ -23,18 +26,22 @@ public final class Session extends AggregateRoot<SessionId> {
     private SessionType sessionType;
     private SessionStatus status;
     private MediaFile mediaFile;
+    private String language;
     private Instant createdAt;
     private Instant modifiedAt;
     private UUID evaluationId;
 
-    private Session() {}
+    private Session() {
+    }
 
-    private Session(SessionId id, UserId userId, SessionTitle title, String description, SessionType sessionType) {
+    private Session(SessionId id, UserId userId, SessionTitle title, String description, SessionType sessionType,
+            String language) {
         super(id);
         this.userId = userId;
         this.title = title;
         this.description = description;
         this.sessionType = sessionType;
+        this.language = language != null ? language : "en";
         this.status = SessionStatus.DRAFT;
         this.createdAt = Instant.now();
         this.modifiedAt = Instant.now();
@@ -42,15 +49,19 @@ public final class Session extends AggregateRoot<SessionId> {
 
     // ===== Factory =====
 
-    public static ResultT<Session> create(UserId userId, SessionTitle title, String description, SessionType sessionType) {
-        var session = new Session(SessionId.create(), userId, title, description, sessionType);
+    public static ResultT<Session> create(
+            UserId userId,
+            SessionTitle title,
+            String description,
+            SessionType sessionType,
+            String language) {
+        var session = new Session(SessionId.create(), userId, title, description, sessionType, language);
 
         session.raiseDomainEvent(new SessionCreatedEvent(
                 session.getId(),
                 userId,
                 title.getValue(),
-                sessionType.getName()
-        ));
+                sessionType.getName()));
 
         return ResultT.success(session);
     }
@@ -65,10 +76,10 @@ public final class Session extends AggregateRoot<SessionId> {
             SessionType sessionType,
             SessionStatus status,
             MediaFile mediaFile,
+            String language,
             Instant createdAt,
             Instant modifiedAt,
-            UUID evaluationId
-    ) {
+            UUID evaluationId) {
         var session = new Session();
         session.id = id;
         session.userId = userId;
@@ -77,6 +88,7 @@ public final class Session extends AggregateRoot<SessionId> {
         session.sessionType = sessionType;
         session.status = status;
         session.mediaFile = mediaFile;
+        session.language = language != null ? language : "en";
         session.createdAt = createdAt;
         session.modifiedAt = modifiedAt;
         session.evaluationId = evaluationId;
@@ -98,8 +110,7 @@ public final class Session extends AggregateRoot<SessionId> {
                 getId(),
                 media.getStoragePath(),
                 media.getContentType(),
-                media.getSizeBytes()
-        ));
+                media.getSizeBytes()));
 
         return Result.success();
     }
@@ -133,8 +144,7 @@ public final class Session extends AggregateRoot<SessionId> {
                 getId(),
                 userId,
                 mediaFile.getStoragePath(),
-                sessionType.getName()
-        ));
+                sessionType.getName()));
 
         return Result.success();
     }
@@ -224,6 +234,10 @@ public final class Session extends AggregateRoot<SessionId> {
 
     public MediaFile getMediaFile() {
         return mediaFile;
+    }
+
+    public String getLanguage() {
+        return language;
     }
 
     public Instant getCreatedAt() {

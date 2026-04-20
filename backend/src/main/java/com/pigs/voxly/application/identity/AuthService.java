@@ -1,10 +1,16 @@
 package com.pigs.voxly.application.identity;
 
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.pigs.voxly.application.identity.dto.AuthTokensResponse;
 import com.pigs.voxly.application.identity.dto.LoginRequest;
 import com.pigs.voxly.application.identity.dto.LoginResponse;
 import com.pigs.voxly.application.identity.dto.RegisterRequest;
 import com.pigs.voxly.application.identity.dto.UserResponse;
+import com.pigs.voxly.application.identity.ports.IdentitySettingsRepository;
 import com.pigs.voxly.application.identity.ports.JwtTokenProvider;
 import com.pigs.voxly.application.identity.ports.PasswordHasher;
 import com.pigs.voxly.domain.identity.User;
@@ -19,27 +25,34 @@ import com.pigs.voxly.sharedKernel.domain.events.DomainEventPublisher;
 import com.pigs.voxly.sharedKernel.domain.results.Result;
 import com.pigs.voxly.sharedKernel.domain.results.ResultT;
 
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.UUID;
-
 @Service
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final IdentitySettingsRepository identitySettingsRepository;
     private final PasswordHasher passwordHasher;
     private final JwtTokenProvider jwtTokenProvider;
     private final DomainEventPublisher domainEventPublisher;
+    private final boolean devBypassEnabled;
+    private final String devEmail;
+    private final String devPassword;
 
     public AuthService(UserRepository userRepository,
-                       PasswordHasher passwordHasher,
-                       JwtTokenProvider jwtTokenProvider,
-                       DomainEventPublisher domainEventPublisher) {
+            IdentitySettingsRepository identitySettingsRepository,
+            PasswordHasher passwordHasher,
+            JwtTokenProvider jwtTokenProvider,
+            DomainEventPublisher domainEventPublisher,
+            @org.springframework.beans.factory.annotation.Value("${app.auth.dev-bypass-enabled:false}") boolean devBypassEnabled,
+            @org.springframework.beans.factory.annotation.Value("${app.auth.dev-email:}") String devEmail,
+            @org.springframework.beans.factory.annotation.Value("${app.auth.dev-password:}") String devPassword) {
         this.userRepository = userRepository;
+        this.identitySettingsRepository = identitySettingsRepository;
         this.passwordHasher = passwordHasher;
         this.jwtTokenProvider = jwtTokenProvider;
         this.domainEventPublisher = domainEventPublisher;
+        this.devBypassEnabled = devBypassEnabled;
+        this.devEmail = devEmail;
+        this.devPassword = devPassword;
     }
 
     // ===== Register =====
@@ -47,10 +60,12 @@ public class AuthService {
     @Transactional
     public ResultT<UserResponse> register(RegisterRequest request) {
         var emailResult = Email.create(request.email());
-        if (emailResult.isFailure()) return ResultT.failure(emailResult.getErrors());
+        if (emailResult.isFailure())
+            return ResultT.failure(emailResult.getErrors());
 
         var usernameResult = Username.create(request.username());
-        if (usernameResult.isFailure()) return ResultT.failure(usernameResult.getErrors());
+        if (usernameResult.isFailure())
+            return ResultT.failure(usernameResult.getErrors());
 
         var email = emailResult.getValue();
         var username = usernameResult.getValue();
@@ -64,12 +79,21 @@ public class AuthService {
 
         String hashedPassword = passwordHasher.hash(request.password());
         var passwordHashResult = PasswordHash.create(hashedPassword);
-        if (passwordHashResult.isFailure()) return ResultT.failure(passwordHashResult.getErrors());
+        if (passwordHashResult.isFailure())
+            return ResultT.failure(passwordHashResult.getErrors());
 
         var userResult = User.create(email, username, passwordHashResult.getValue());
-        if (userResult.isFailure()) return ResultT.failure(userResult.getErrors());
+        if (userResult.isFailure())
+            return ResultT.failure(userResult.getErrors());
 
+        boolean requiresEmailVerification = identitySettingsRepository.isEmailVerificationRequired();
         var user = userResult.getValue();
+
+        // If verification is disabled, mark account verified at signup.
+        if (!requiresEmailVerification && user.getEmailVerificationToken() != null) {
+            user.verifyEmail(user.getEmailVerificationToken());
+        }
+
         userRepository.save(user);
         publishAndClear(user);
 
@@ -78,14 +102,13 @@ public class AuthService {
 
     // ===== Login =====
 
-    private static final String DEV_EMAIL = "edumarreroglezz@gmail.com";
-
     @Transactional
     public ResultT<LoginResponse> login(LoginRequest request) {
         var userOpt = userRepository.findByEmailOrUsername(request.identifier());
 
         // DEV BYPASS: Auto-create dev user if doesn't exist
-        if (userOpt.isEmpty() && request.identifier().equalsIgnoreCase(DEV_EMAIL)) {
+        if (devBypassEnabled && hasDevBypassConfigured() && userOpt.isEmpty()
+                && request.identifier().equalsIgnoreCase(devEmail)) {
             var devUser = createDevUser();
             if (devUser != null) {
                 userOpt = java.util.Optional.of(devUser);
@@ -99,9 +122,12 @@ public class AuthService {
         var user = userOpt.get();
 
         // DEV BYPASS: Skip all validations for dev email
-        boolean isDevUser = user.getEmail().getValue().equalsIgnoreCase(DEV_EMAIL);
+        boolean isDevUser = devBypassEnabled && hasDevBypassConfigured()
+                && user.getEmail().getValue().equalsIgnoreCase(devEmail);
 
         if (!isDevUser) {
+            boolean requiresEmailVerification = identitySettingsRepository.isEmailVerificationRequired();
+
             if (!user.isActive()) {
                 return ResultT.failure(UserErrors.USER_DEACTIVATED);
             }
@@ -114,7 +140,7 @@ public class AuthService {
                 publishAndClear(user);
                 return ResultT.failure(UserErrors.INVALID_CREDENTIALS);
             }
-            if (!user.isEmailVerified()) {
+            if (requiresEmailVerification && !user.isEmailVerified()) {
                 return ResultT.failure(UserErrors.EMAIL_NOT_VERIFIED);
             }
 
@@ -154,7 +180,8 @@ public class AuthService {
 
         var user = userOpt.get();
         var result = user.revokeRefreshToken(refreshTokenValue);
-        if (result.isFailure()) return result;
+        if (result.isFailure())
+            return result;
 
         userRepository.save(user);
         return Result.success();
@@ -202,7 +229,8 @@ public class AuthService {
 
         var user = userOpt.get();
         var result = user.verifyEmail(token);
-        if (result.isFailure()) return result;
+        if (result.isFailure())
+            return result;
 
         userRepository.save(user);
         publishAndClear(user);
@@ -218,7 +246,8 @@ public class AuthService {
 
         var user = userOpt.get();
         var result = user.verifyEmail(token);
-        if (result.isFailure()) return result;
+        if (result.isFailure())
+            return result;
 
         userRepository.save(user);
         publishAndClear(user);
@@ -230,7 +259,8 @@ public class AuthService {
     @Transactional
     public Result requestPasswordReset(String emailValue) {
         var emailResult = Email.create(emailValue);
-        if (emailResult.isFailure()) return emailResult.toResult();
+        if (emailResult.isFailure())
+            return emailResult.toResult();
 
         var userOpt = userRepository.findByEmail(emailResult.getValue());
         if (userOpt.isEmpty()) {
@@ -259,10 +289,12 @@ public class AuthService {
         var user = userOpt.get();
         String hashedPassword = passwordHasher.hash(newPassword);
         var passwordHashResult = PasswordHash.create(hashedPassword);
-        if (passwordHashResult.isFailure()) return passwordHashResult.toResult();
+        if (passwordHashResult.isFailure())
+            return passwordHashResult.toResult();
 
         var result = user.resetPassword(token, passwordHashResult.getValue());
-        if (result.isFailure()) return result;
+        if (result.isFailure())
+            return result;
 
         user.revokeAllRefreshTokens();
         userRepository.save(user);
@@ -286,7 +318,8 @@ public class AuthService {
         }
 
         var result = user.enableTwoFactor();
-        if (result.isFailure()) return result;
+        if (result.isFailure())
+            return result;
 
         userRepository.save(user);
         publishAndClear(user);
@@ -302,7 +335,8 @@ public class AuthService {
 
         var user = userOpt.get();
         var result = user.disableTwoFactor();
-        if (result.isFailure()) return result;
+        if (result.isFailure())
+            return result;
 
         userRepository.save(user);
         publishAndClear(user);
@@ -335,16 +369,24 @@ public class AuthService {
 
     private User createDevUser() {
         try {
-            var emailResult = Email.create(DEV_EMAIL);
+            if (!hasDevBypassConfigured()) {
+                return null;
+            }
+
+            var emailResult = Email.create(devEmail);
             var usernameResult = Username.create("Eduardo");
-            if (emailResult.isFailure() || usernameResult.isFailure()) return null;
+            if (emailResult.isFailure() || usernameResult.isFailure())
+                return null;
 
-            String hashedPassword = passwordHasher.hash("dev123");
+            String hashedPassword = passwordHasher.hash(devPassword);
             var passwordHashResult = PasswordHash.create(hashedPassword);
-            if (passwordHashResult.isFailure()) return null;
+            if (passwordHashResult.isFailure())
+                return null;
 
-            var userResult = User.create(emailResult.getValue(), usernameResult.getValue(), passwordHashResult.getValue());
-            if (userResult.isFailure()) return null;
+            var userResult = User.create(emailResult.getValue(), usernameResult.getValue(),
+                    passwordHashResult.getValue());
+            if (userResult.isFailure())
+                return null;
 
             var user = userResult.getValue();
             // Force email verification for dev user
@@ -354,6 +396,10 @@ public class AuthService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private boolean hasDevBypassConfigured() {
+        return devEmail != null && !devEmail.isBlank() && devPassword != null && !devPassword.isBlank();
     }
 
     private AuthTokensResponse generateAndStoreTokens(User user) {

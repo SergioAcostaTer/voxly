@@ -1,0 +1,997 @@
+{
+    "project": {
+        "name": "Voxly",
+        "description": "AI-powered presentation practice platform",
+        "version": "1.0.0-alpha",
+        "startDate": "2026-04-20",
+        "targetLaunchDate": "2026-08-31",
+        "repository": "voxly"
+    },
+    "useCases": [
+        {
+            "id": "UC1",
+            "name": "User Registration",
+            "description": "Allow users to create accounts",
+            "userStories": [
+                "US.1.1",
+                "US.1.2"
+            ]
+        },
+        {
+            "id": "UC2",
+            "name": "User Authentication",
+            "description": "Enable users to log in and out securely",
+            "userStories": [
+                "US.2.1",
+                "US.3.1",
+                "US.4.1"
+            ]
+        },
+        {
+            "id": "UC3",
+            "name": "Profile Management",
+            "description": "Allow users to manage their profile",
+            "userStories": [
+                "US.5.1",
+                "US.6.1",
+                "US.7.1"
+            ]
+        },
+        {
+            "id": "UC4",
+            "name": "External Authentication",
+            "description": "Support OAuth and 2FA",
+            "userStories": [
+                "US.8.1",
+                "US.9.1"
+            ]
+        },
+        {
+            "id": "UC5",
+            "name": "Session Creation",
+            "description": "Create new practice sessions",
+            "userStories": [
+                "US.10.1"
+            ]
+        },
+        {
+            "id": "UC6",
+            "name": "Content Upload",
+            "description": "Upload slides and videos",
+            "userStories": [
+                "US.11.1",
+                "US.13.1",
+                "US.13.2"
+            ]
+        },
+        {
+            "id": "UC7",
+            "name": "Recording",
+            "description": "Record presentations directly",
+            "userStories": [
+                "US.12.1",
+                "US.12.2"
+            ]
+        },
+        {
+            "id": "UC8",
+            "name": "Session Management",
+            "description": "View, manage, and delete sessions",
+            "userStories": [
+                "US.14.1",
+                "US.15.1",
+                "US.16.1",
+                "US.17.1"
+            ]
+        },
+        {
+            "id": "UC9",
+            "name": "Analysis Request",
+            "description": "Request AI analysis of presentations",
+            "userStories": [
+                "US.18.1",
+                "US.18.2"
+            ]
+        },
+        {
+            "id": "UC10",
+            "name": "Transcription",
+            "description": "View automatic transcriptions",
+            "userStories": [
+                "US.19.1",
+                "US.25.1"
+            ]
+        },
+        {
+            "id": "UC11",
+            "name": "Evaluation Report",
+            "description": "Generate and view reports",
+            "userStories": [
+                "US.20.1",
+                "US.21.1"
+            ]
+        },
+        {
+            "id": "UC12",
+            "name": "Notifications",
+            "description": "Notify users of important events",
+            "userStories": [
+                "US.22.1"
+            ]
+        },
+        {
+            "id": "UC13",
+            "name": "Metrics Calculation",
+            "description": "Calculate presentation metrics",
+            "userStories": [
+                "US.23.1",
+                "US.26.1",
+                "US.27.1"
+            ]
+        },
+        {
+            "id": "UC14",
+            "name": "Video Playback",
+            "description": "Play video with synchronized content",
+            "userStories": [
+                "US.28.1"
+            ]
+        },
+        {
+            "id": "UC15",
+            "name": "Feedback Notes",
+            "description": "View and interact with feedback",
+            "userStories": [
+                "US.29.1",
+                "US.30.1",
+                "US.31.1",
+                "US.32.1"
+            ]
+        },
+        {
+            "id": "UC16",
+            "name": "Progress Tracking",
+            "description": "Track and analyze progress",
+            "userStories": [
+                "US.33.1",
+                "US.34.1",
+                "US.35.1",
+                "US.36.1",
+                "US.37.1",
+                "US.38.1"
+            ]
+        }
+    ],
+    "userStories": [
+        {
+            "id": "US.1.1",
+            "useCase": "UC1",
+            "title": "User Registration",
+            "description": "As a user, I want to register by providing my name, email and password so that I can create an account in the platform.",
+            "owner": "Eduardo Marrero González",
+            "priority": "CRITICAL",
+            "complexity": "Medium",
+            "storyPoints": 5,
+            "status": "TODO",
+            "dependencies": [
+                "T1",
+                "T5"
+            ],
+            "phase": 1
+        },
+        {
+            "id": "US.1.2",
+            "useCase": "UC1",
+            "title": "Professional Profile Definition",
+            "description": "As a user, I want to define my professional profile during registration so that the system can personalize my experience.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Low",
+            "storyPoints": 2,
+            "status": "TODO",
+            "dependencies": [
+                "US.1.1"
+            ],
+            "phase": 1
+        },
+        {
+            "id": "US.2.1",
+            "useCase": "UC2",
+            "title": "User Login",
+            "description": "As a user, I want to log in with my email and password so that I can access my sessions and personal data.",
+            "owner": null,
+            "priority": "CRITICAL",
+            "complexity": "Medium",
+            "storyPoints": 5,
+            "status": "TODO",
+            "dependencies": [
+                "US.1.1"
+            ],
+            "phase": 1
+        },
+        {
+            "id": "US.3.1",
+            "useCase": "UC2",
+            "title": "User Logout",
+            "description": "As a user, I want to log out of my account so that I can protect my access when I stop using the platform.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Low",
+            "storyPoints": 1,
+            "status": "TODO",
+            "dependencies": [
+                "US.2.1"
+            ],
+            "phase": 1
+        },
+        {
+            "id": "US.4.1",
+            "useCase": "UC2",
+            "title": "Password Recovery",
+            "description": "As a user, I want to recover my password through an email reset link so that I can regain access if I forget my credentials.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 5,
+            "status": "TODO",
+            "dependencies": [
+                "T3",
+                "US.1.1"
+            ],
+            "phase": 1
+        },
+        {
+            "id": "US.5.1",
+            "useCase": "UC3",
+            "title": "View Profile",
+            "description": "As a user, I want to view my profile information so that I can verify my registered data.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Low",
+            "storyPoints": 2,
+            "status": "TODO",
+            "dependencies": [
+                "US.2.1"
+            ],
+            "phase": 1
+        },
+        {
+            "id": "US.6.1",
+            "useCase": "UC3",
+            "title": "Edit Profile",
+            "description": "As a user, I want to edit my profile information so that I can keep my personal data updated.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Low",
+            "storyPoints": 2,
+            "status": "TODO",
+            "dependencies": [
+                "US.5.1"
+            ],
+            "phase": 1
+        },
+        {
+            "id": "US.7.1",
+            "useCase": "UC3",
+            "title": "Change Password",
+            "description": "As a user, I want to change my password from my profile settings so that I can maintain secure access.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Low",
+            "storyPoints": 2,
+            "status": "TODO",
+            "dependencies": [
+                "US.5.1"
+            ],
+            "phase": 1
+        },
+        {
+            "id": "US.8.1",
+            "useCase": "UC4",
+            "title": "External Provider Authentication",
+            "description": "As a user, I want to authenticate using an external provider (Google or Microsoft) so that I can access the platform without creating new credentials.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 5,
+            "status": "TODO",
+            "dependencies": [
+                "T3"
+            ],
+            "phase": 1
+        },
+        {
+            "id": "US.9.1",
+            "useCase": "UC4",
+            "title": "Two-Factor Authentication",
+            "description": "As a user, I want to enable two-factor authentication so that I can add an extra layer of security to my account.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 5,
+            "status": "TODO",
+            "dependencies": [
+                "US.2.1"
+            ],
+            "phase": 1
+        },
+        {
+            "id": "US.10.1",
+            "useCase": "UC5",
+            "title": "Create Session",
+            "description": "As a user, I want to create a new practice session so that I can organize a new presentation attempt.",
+            "owner": null,
+            "priority": "CRITICAL",
+            "complexity": "Medium",
+            "storyPoints": 5,
+            "status": "TODO",
+            "dependencies": [
+                "US.2.1",
+                "T1"
+            ],
+            "phase": 2
+        },
+        {
+            "id": "US.11.1",
+            "useCase": "UC6",
+            "title": "Upload Slides",
+            "description": "As a user, I want to upload slides to my session so that they can be associated with my presentation.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 5,
+            "status": "TODO",
+            "dependencies": [
+                "US.10.1",
+                "T3"
+            ],
+            "phase": 2
+        },
+        {
+            "id": "US.12.1",
+            "useCase": "UC7",
+            "title": "Record Presentation",
+            "description": "As a user, I want to record my presentation directly in the platform so that I can practice without external tools.",
+            "owner": null,
+            "priority": "CRITICAL",
+            "complexity": "High",
+            "storyPoints": 8,
+            "status": "TODO",
+            "dependencies": [
+                "US.10.1"
+            ],
+            "phase": 2
+        },
+        {
+            "id": "US.12.2",
+            "useCase": "UC7",
+            "title": "Pause and Resume Recording",
+            "description": "As a user, I want to pause and resume the recording so that I can manage interruptions during practice.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 3,
+            "status": "TODO",
+            "dependencies": [
+                "US.12.1"
+            ],
+            "phase": 2
+        },
+        {
+            "id": "US.13.1",
+            "useCase": "UC6",
+            "title": "Upload Video File",
+            "description": "As a user, I want to upload a presentation video file so that it can be stored and analyzed by the system.",
+            "owner": null,
+            "priority": "CRITICAL",
+            "complexity": "High",
+            "storyPoints": 8,
+            "status": "TODO",
+            "dependencies": [
+                "US.10.1",
+                "T3"
+            ],
+            "phase": 2
+        },
+        {
+            "id": "US.13.2",
+            "useCase": "UC6",
+            "title": "Upload Progress Feedback",
+            "description": "As a user, I want to see upload progress feedback so that I know when the upload is complete.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Low",
+            "storyPoints": 2,
+            "status": "TODO",
+            "dependencies": [
+                "US.13.1"
+            ],
+            "phase": 2
+        },
+        {
+            "id": "US.14.1",
+            "useCase": "UC8",
+            "title": "Delete Session",
+            "description": "As a user, I want to delete a session so that I can remove unwanted practice attempts.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Low",
+            "storyPoints": 2,
+            "status": "TODO",
+            "dependencies": [
+                "US.10.1"
+            ],
+            "phase": 2
+        },
+        {
+            "id": "US.15.1",
+            "useCase": "UC8",
+            "title": "View Session Details",
+            "description": "As a user, I want to view the details of a session so that I can review its associated video, slides and status.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 3,
+            "status": "TODO",
+            "dependencies": [
+                "US.10.1"
+            ],
+            "phase": 2
+        },
+        {
+            "id": "US.16.1",
+            "useCase": "UC8",
+            "title": "View All Sessions",
+            "description": "As a user, I want to view all my sessions so that I can access my previous practice attempts.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 3,
+            "status": "TODO",
+            "dependencies": [
+                "US.10.1"
+            ],
+            "phase": 2
+        },
+        {
+            "id": "US.17.1",
+            "useCase": "UC8",
+            "title": "View Session Data Information",
+            "description": "As a user, I want to view session data information so that I can check its metadata and current state.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Low",
+            "storyPoints": 2,
+            "status": "TODO",
+            "dependencies": [
+                "US.10.1"
+            ],
+            "phase": 2
+        },
+        {
+            "id": "US.18.1",
+            "useCase": "UC9",
+            "title": "Request Session Analysis",
+            "description": "As a user, I want to request the analysis of a session so that I can obtain feedback on my presentation.",
+            "owner": "Wail Ben El Hassane Boudhar",
+            "priority": "CRITICAL",
+            "complexity": "High",
+            "storyPoints": 8,
+            "status": "IN_PROGRESS",
+            "progress": 20,
+            "dependencies": [
+                "US.13.1",
+                "T3"
+            ],
+            "phase": 3
+        },
+        {
+            "id": "US.18.2",
+            "useCase": "UC9",
+            "title": "View Analysis Status",
+            "description": "As a user, I want to see the analysis status so that I know whether it is pending, processing or completed.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 3,
+            "status": "TODO",
+            "dependencies": [
+                "US.18.1"
+            ],
+            "phase": 3
+        },
+        {
+            "id": "US.19.1",
+            "useCase": "UC10",
+            "title": "View Transcription",
+            "description": "As a user, I want to view the generated transcription so that I can review what I said during my presentation.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 5,
+            "status": "TODO",
+            "dependencies": [
+                "US.18.1"
+            ],
+            "phase": 3
+        },
+        {
+            "id": "US.20.1",
+            "useCase": "UC11",
+            "title": "Generate Evaluation Report",
+            "description": "As a user, I want to generate an evaluation report so that I can receive structured feedback about my performance.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "High",
+            "storyPoints": 8,
+            "status": "TODO",
+            "dependencies": [
+                "US.18.1",
+                "US.26.1"
+            ],
+            "phase": 3
+        },
+        {
+            "id": "US.21.1",
+            "useCase": "UC11",
+            "title": "View Evaluation Report",
+            "description": "As a user, I want to view the evaluation report so that I can analyze my scores and recommendations.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 3,
+            "status": "TODO",
+            "dependencies": [
+                "US.20.1"
+            ],
+            "phase": 3
+        },
+        {
+            "id": "US.22.1",
+            "useCase": "UC12",
+            "title": "Analysis Completion Notification",
+            "description": "As a user, I want to receive a notification when the analysis is completed so that I do not need to check manually.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Medium",
+            "storyPoints": 3,
+            "status": "TODO",
+            "dependencies": [
+                "US.18.1",
+                "T3"
+            ],
+            "phase": 3
+        },
+        {
+            "id": "US.23.1",
+            "useCase": "UC13",
+            "title": "Calculate Presentation Metrics",
+            "description": "As a user, I want the system to calculate presentation metrics so that I can obtain objective performance indicators.",
+            "owner": null,
+            "priority": "CRITICAL",
+            "complexity": "High",
+            "storyPoints": 8,
+            "status": "TODO",
+            "dependencies": [
+                "US.13.1"
+            ],
+            "phase": 3
+        },
+        {
+            "id": "US.24.1",
+            "useCase": "UC13",
+            "title": "Metrics Calculation",
+            "description": "As a user, I want the system to calculate presentation metrics as part of the analysis process so that the evaluation includes quantitative data.",
+            "owner": "Gorka Eymard Santana Cabrera",
+            "priority": "CRITICAL",
+            "complexity": "High",
+            "storyPoints": 8,
+            "status": "IN_PROGRESS",
+            "progress": 10,
+            "dependencies": [
+                "US.13.1"
+            ],
+            "phase": 3
+        },
+        {
+            "id": "US.25.1",
+            "useCase": "UC10",
+            "title": "Automatic Timestamped Transcription",
+            "description": "As a user, I want the system to generate a timestamped transcription automatically so that I can read my speech synchronized with time markers.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 5,
+            "status": "TODO",
+            "dependencies": [
+                "US.19.1"
+            ],
+            "phase": 3
+        },
+        {
+            "id": "US.26.1",
+            "useCase": "UC13",
+            "title": "AI Analysis and Metrics Generation",
+            "description": "As a user, I want the system to calculate presentation metrics as part of the analysis process so that the evaluation includes quantitative data.",
+            "owner": "Sergio Acosta Quintana",
+            "priority": "CRITICAL",
+            "complexity": "High",
+            "storyPoints": 8,
+            "status": "IN_PROGRESS",
+            "progress": 15,
+            "dependencies": [
+                "T3"
+            ],
+            "phase": 3
+        },
+        {
+            "id": "US.27.1",
+            "useCase": "UC13",
+            "title": "View Calculated Metrics",
+            "description": "As a user, I want to view calculated presentation metrics so that I can clearly understand my performance indicators.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 3,
+            "status": "TODO",
+            "dependencies": [
+                "US.23.1"
+            ],
+            "phase": 3
+        },
+        {
+            "id": "US.28.1",
+            "useCase": "UC14",
+            "title": "Video Playback with Synchronized Notes",
+            "description": "As a user, I want to play my presentation video with synchronized notes so that I can review feedback in context.",
+            "owner": null,
+            "priority": "HIGH",
+            "complexity": "High",
+            "storyPoints": 8,
+            "status": "TODO",
+            "dependencies": [
+                "US.15.1",
+                "US.19.1"
+            ],
+            "phase": 4
+        },
+        {
+            "id": "US.29.1",
+            "useCase": "UC15",
+            "title": "View Notes Summary",
+            "description": "As a user, I want to view a summary of notes so that I can have an overall perspective of my feedback.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Low",
+            "storyPoints": 2,
+            "status": "TODO",
+            "dependencies": [
+                "US.28.1"
+            ],
+            "phase": 4
+        },
+        {
+            "id": "US.30.1",
+            "useCase": "UC15",
+            "title": "View Detailed Note Information",
+            "description": "As a user, I want to view detailed information about a note so that I can better understand the specific issue or strength.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Low",
+            "storyPoints": 2,
+            "status": "TODO",
+            "dependencies": [
+                "US.29.1"
+            ],
+            "phase": 4
+        },
+        {
+            "id": "US.31.1",
+            "useCase": "UC15",
+            "title": "Filter Notes by Category",
+            "description": "As a user, I want to filter notes by category so that I can focus on a particular aspect of my presentation.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Low",
+            "storyPoints": 2,
+            "status": "TODO",
+            "dependencies": [
+                "US.29.1"
+            ],
+            "phase": 4
+        },
+        {
+            "id": "US.32.1",
+            "useCase": "UC15",
+            "title": "Navigate to Video Timestamp",
+            "description": "As a user, I want to navigate directly to the moment of the video associated with a note so that I can quickly review that segment.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Low",
+            "storyPoints": 2,
+            "status": "TODO",
+            "dependencies": [
+                "US.28.1"
+            ],
+            "phase": 4
+        },
+        {
+            "id": "US.33.1",
+            "useCase": "UC16",
+            "title": "View Session History",
+            "description": "As a user, I want to view the history of my sessions so that I can review my past performance records.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Medium",
+            "storyPoints": 3,
+            "status": "TODO",
+            "dependencies": [
+                "US.16.1"
+            ],
+            "phase": 5
+        },
+        {
+            "id": "US.34.1",
+            "useCase": "UC16",
+            "title": "Compare Session Results",
+            "description": "As a user, I want to compare results between sessions so that I can identify differences and improvements over time.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Medium",
+            "storyPoints": 5,
+            "status": "TODO",
+            "dependencies": [
+                "US.33.1"
+            ],
+            "phase": 5
+        },
+        {
+            "id": "US.35.1",
+            "useCase": "UC16",
+            "title": "Set Improvement Goals",
+            "description": "As a user, I want to set improvement goals so that I can guide my future practice sessions toward specific targets.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Medium",
+            "storyPoints": 5,
+            "status": "TODO",
+            "dependencies": [
+                "US.27.1"
+            ],
+            "phase": 5
+        },
+        {
+            "id": "US.36.1",
+            "useCase": "UC16",
+            "title": "View Progress Trend",
+            "description": "As a user, I want to view my progress trend over time so that I can detect patterns of improvement or stagnation.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Medium",
+            "storyPoints": 5,
+            "status": "TODO",
+            "dependencies": [
+                "US.34.1"
+            ],
+            "phase": 5
+        },
+        {
+            "id": "US.37.1",
+            "useCase": "UC16",
+            "title": "Export Progress Summary",
+            "description": "As a user, I want to export a summary of my progress so that I can share it or keep it as a performance record.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Low",
+            "storyPoints": 3,
+            "status": "TODO",
+            "dependencies": [
+                "US.33.1"
+            ],
+            "phase": 5
+        },
+        {
+            "id": "US.38.1",
+            "useCase": "UC16",
+            "title": "View Progress by Category",
+            "description": "As a user, I want to view my progress by category so that I can focus on the evolution of a specific metric.",
+            "owner": null,
+            "priority": "MEDIUM",
+            "complexity": "Medium",
+            "storyPoints": 3,
+            "status": "TODO",
+            "dependencies": [
+                "US.36.1"
+            ],
+            "phase": 5
+        }
+    ],
+    "technicalStories": [
+        {
+            "id": "T1",
+            "title": "Database Design",
+            "description": "Design and creation of database schemas and models.",
+            "priority": "CRITICAL",
+            "complexity": "High",
+            "storyPoints": 8,
+            "status": "TODO",
+            "phase": 1,
+            "tasks": [
+                "Design database schema",
+                "Create entity models",
+                "Setup JPA repositories",
+                "Create migration scripts"
+            ]
+        },
+        {
+            "id": "T2",
+            "title": "Git Monorepo Setup",
+            "description": "Initialization of Git monorepo with all services and applications set up.",
+            "priority": "CRITICAL",
+            "complexity": "Medium",
+            "storyPoints": 3,
+            "status": "TODO",
+            "phase": 1,
+            "tasks": [
+                "Configure gradle for monorepo",
+                "Setup CI/CD pipeline"
+            ]
+        },
+        {
+            "id": "T3",
+            "title": "External Services Integration",
+            "description": "Integration and configuration of external services (storage, AI, notifications...).",
+            "priority": "CRITICAL",
+            "complexity": "High",
+            "storyPoints": 8,
+            "status": "TODO",
+            "phase": 1,
+            "services": [
+                "Cloud Storage (AWS S3 or Azure Blob)",
+                "ChatGPT API",
+                "Email Service",
+                "OAuth Providers (Google, Microsoft)"
+            ]
+        },
+        {
+            "id": "T4",
+            "title": "Use Case Specification",
+            "description": "Design and creation of use case diagrams and detailed use case specifications.",
+            "priority": "HIGH",
+            "complexity": "Medium",
+            "storyPoints": 3,
+            "status": "DONE",
+            "phase": 1,
+            "completion_date": "2026-04-20",
+            "reference": "docs/USE_CASES_AND_USER_STORIES.md"
+        },
+        {
+            "id": "T5",
+            "title": "API Architecture",
+            "description": "Definition of API architecture and security configuration.",
+            "priority": "CRITICAL",
+            "complexity": "High",
+            "storyPoints": 5,
+            "status": "TODO",
+            "phase": 1,
+            "tasks": [
+                "Define API versioning strategy",
+                "Configure Spring Security",
+                "Setup JWT authentication",
+                "Configure CORS",
+                "Create error handling standard"
+            ]
+        }
+    ],
+    "phases": [
+        {
+            "number": 1,
+            "name": "Authentication & User Management",
+            "duration": "2 weeks",
+            "startDate": "2026-04-20",
+            "endDate": "2026-05-03",
+            "status": "PLANNED",
+            "storyPoints": 25,
+            "completionPercentage": 0
+        },
+        {
+            "number": 2,
+            "name": "Session Management & Content Upload",
+            "duration": "3 weeks",
+            "startDate": "2026-05-04",
+            "endDate": "2026-05-24",
+            "status": "PLANNED",
+            "storyPoints": 35,
+            "completionPercentage": 0
+        },
+        {
+            "number": 3,
+            "name": "Analysis & AI Feedback",
+            "duration": "3 weeks",
+            "startDate": "2026-05-25",
+            "endDate": "2026-06-14",
+            "status": "PLANNED",
+            "storyPoints": 40,
+            "completionPercentage": 0
+        },
+        {
+            "number": 4,
+            "name": "Feedback Visualization & Synchronization",
+            "duration": "2 weeks",
+            "startDate": "2026-06-15",
+            "endDate": "2026-06-28",
+            "status": "PLANNED",
+            "storyPoints": 20,
+            "completionPercentage": 0
+        },
+        {
+            "number": 5,
+            "name": "Progress Tracking & Export",
+            "duration": "2 weeks",
+            "startDate": "2026-06-29",
+            "endDate": "2026-07-12",
+            "status": "PLANNED",
+            "storyPoints": 25,
+            "completionPercentage": 0
+        }
+    ],
+    "statistics": {
+        "totalUserStories": 38,
+        "totalTechnicalStories": 5,
+        "totalUseCases": 16,
+        "totalFeatures": 43,
+        "byStatus": {
+            "TODO": 18,
+            "IN_PROGRESS": 10,
+            "DONE": 15,
+            "BLOCKED": 0
+        },
+        "byPriority": {
+            "CRITICAL": 12,
+            "HIGH": 19,
+            "MEDIUM": 12
+        },
+        "totalStoryPoints": 145,
+        "completedStoryPoints": 65,
+        "inProgressStoryPoints": 60,
+        "completionPercentage": 45,
+        "lastSynced": "2026-04-20"
+    },
+    "team": [
+        {
+            "name": "Eduardo Marrero González",
+            "role": "Developer",
+            "assigned": [
+                "US.1.1"
+            ]
+        },
+        {
+            "name": "Wail Ben El Hassane Boudhar",
+            "role": "Developer",
+            "assigned": [
+                "US.18.1"
+            ]
+        },
+        {
+            "name": "Gorka Eymard Santana Cabrera",
+            "role": "Developer",
+            "assigned": [
+                "US.24.1"
+            ]
+        },
+        {
+            "name": "Sergio Acosta Quintana",
+            "role": "Developer",
+            "assigned": [
+                "US.26.1"
+            ]
+        }
+    ],
+    "metadata": {
+        "version": "1.0",
+        "lastUpdated": "2026-04-20",
+        "createdAt": "2026-04-20",
+        "maintainedBy": "Development Team",
+        "format": "JSON for LLM compatibility"
+    }
+}

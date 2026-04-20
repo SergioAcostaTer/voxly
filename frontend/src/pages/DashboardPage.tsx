@@ -1,13 +1,43 @@
 import { BarChart3, LogOut, Mic2, Plus, TrendingUp, Video } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
+import { api, ApiClientError } from '../lib/api'
+import type { ProgressSummary } from '../types/progress'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Logo } from '../ui/Logo'
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, logout, accessToken } = useAuth()
+  const [summary, setSummary] = useState<ProgressSummary | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchSummary() {
+      if (!accessToken) return
+
+      try {
+        const data = await api.getProgressSummary(accessToken)
+        if (!cancelled) {
+          setSummary(data)
+        }
+      } catch (error) {
+        if (error instanceof ApiClientError && error.status === 401) {
+          await logout()
+          navigate('/login', { replace: true })
+        }
+      }
+    }
+
+    void fetchSummary()
+
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken, logout, navigate])
 
   async function handleLogout() {
     await logout()
@@ -102,15 +132,17 @@ export function DashboardPage() {
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl bg-muted/30 p-4 text-center">
-              <p className="text-2xl font-bold text-foreground">--</p>
+              <p className="text-2xl font-bold text-foreground">{summary?.totalSessions ?? '--'}</p>
               <p className="mt-1 text-sm text-muted-foreground">Total Sessions</p>
             </div>
             <div className="rounded-xl bg-muted/30 p-4 text-center">
-              <p className="text-2xl font-bold text-foreground">--</p>
+              <p className="text-2xl font-bold text-foreground">
+                {summary?.averageClarityScore != null ? summary.averageClarityScore.toFixed(1) : '--'}
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">Avg. Clarity Score</p>
             </div>
             <div className="rounded-xl bg-muted/30 p-4 text-center">
-              <p className="text-2xl font-bold text-foreground">--</p>
+              <p className="text-2xl font-bold text-foreground">{summary?.averageWordsPerMinute ?? '--'}</p>
               <p className="mt-1 text-sm text-muted-foreground">Avg. WPM</p>
             </div>
           </div>

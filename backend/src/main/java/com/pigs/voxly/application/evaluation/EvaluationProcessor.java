@@ -1,5 +1,15 @@
 package com.pigs.voxly.application.evaluation;
 
+import java.nio.file.Path;
+import java.util.List;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pigs.voxly.application.shared.ports.SpeechAnalysisService;
@@ -7,15 +17,7 @@ import com.pigs.voxly.application.shared.ports.StorageService;
 import com.pigs.voxly.application.shared.ports.TranscriptionService;
 import com.pigs.voxly.domain.evaluation.EvaluationId;
 import com.pigs.voxly.domain.evaluation.EvaluationRepository;
-import com.pigs.voxly.domain.sessions.Session;
 import com.pigs.voxly.domain.sessions.SessionRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.UUID;
 
 @Service
 public class EvaluationProcessor {
@@ -35,8 +37,7 @@ public class EvaluationProcessor {
             TranscriptionService transcriptionService,
             SpeechAnalysisService speechAnalysisService,
             StorageService storageService,
-            ObjectMapper objectMapper
-    ) {
+            ObjectMapper objectMapper) {
         this.evaluationRepository = evaluationRepository;
         this.sessionRepository = sessionRepository;
         this.transcriptionService = transcriptionService;
@@ -78,74 +79,101 @@ public class EvaluationProcessor {
             return;
         }
 
-        // Step 1: Transcription
-        log.info("Starting transcription for evaluation: {}", evaluationId);
-        evaluation.startTranscription();
-        evaluationRepository.save(evaluation);
-
-        var mediaPath = storageService.getAbsolutePath(session.getMediaFile().getStoragePath());
-        var transcriptionResult = transcriptionService.transcribe(mediaPath, null);
-
-        if (transcriptionResult.isFailure()) {
-            failEvaluation(evaluationId, "Transcription failed: " + transcriptionResult.getError().getMessage());
+        if (evaluation.isCompleted() || evaluation.isFailed()) {
+            log.info("Skipping evaluation {} because status is {}", evaluationId, evaluation.getStatus().getName());
             return;
         }
 
-        var transcription = transcriptionResult.getValue();
-
+        Path mediaPath = null;
         try {
-            String segmentsJson = objectMapper.writeValueAsString(transcription.segments());
-            evaluation.completeTranscription(
-                    transcription.fullText(),
-                    segmentsJson,
-                    transcription.durationSeconds(),
-                    transcription.detectedLanguage()
-            );
-            evaluationRepository.save(evaluation);
-        } catch (JsonProcessingException e) {
-            failEvaluation(evaluationId, "Failed to serialize transcription");
-            return;
-        }
+            mediaPath = storageService.getAbsolutePath(session.getMediaFile().getStoragePath());
 
-        // Step 2: Analysis
-        log.info("Starting analysis for evaluation: {}", evaluationId);
-        var analysisResult = speechAnalysisService.analyze(transcription, session.getSessionType().getName());
+            com.pigs.voxly.application.shared.ports.TranscriptionService.TranscriptionResult transcription;
 
-        if (analysisResult.isFailure()) {
-            failEvaluation(evaluationId, "Analysis failed: " + analysisResult.getError().getMessage());
-            return;
-        }
+            // Step 1: Transcription (skip if already done and status is ANALYZING)
+            if ("analyzing".equalsIgnoreCase(evaluation.getStatus().getName())
+                    && evaluation.getTranscriptionText() != null) {
+                transcription = new com.pigs.voxly.application.shared.ports.TranscriptionService.TranscriptionResult(
+                        evaluation.getTranscriptionText(),
+                        List.of(),
+                        evaluation.getDetectedLanguage() != null ? evaluation.getDetectedLanguage()
+                                : session.getLanguage(),
+                        evaluation.getDurationSeconds() != null ? evaluation.getDurationSeconds() : 0.0);
+            } else {
+                log.info("Starting transcription for evaluation: {}", evaluationId);
+                var startResult = evaluation.startTranscription();
+                if (startResult.isFailure()) {
+                    failEvaluation(evaluationId, "Cannot start transcription from current status");
+                    return;
+                }
 
-        var analysis = analysisResult.getValue();
+                evaluationRepository.save(evaluation);
 
-        try {
-            String metricsJson = objectMapper.writeValueAsString(analysis.metrics());
-            String feedbackJson = objectMapper.writeValueAsString(analysis.feedbackNotes());
-            String strengthsJson = objectMapper.writeValueAsString(analysis.strengths());
-            String improvementsJson = objectMapper.writeValueAsString(analysis.areasForImprovement());
+                var transcriptionResult = transcriptionService.transcribe(mediaPath, session.getLanguage());
 
-            evaluation.completeAnalysis(
-                    analysis.metrics().wordsPerMinute(),
-                    analysis.metrics().totalWords(),
-                    analysis.metrics().fillerWordCount(),
-                    analysis.metrics().pauseCount(),
-                    analysis.metrics().clarityScore(),
-                    metricsJson,
-                    feedbackJson,
-                    analysis.overallSummary(),
-                    strengthsJson,
-                    improvementsJson
-            );
-            evaluationRepository.save(evaluation);
+                if (transcriptionResult.isFailure()) {
+                    failEvaluation(evaluationId,
+                            "Transcription failed: " + transcriptionResult.getError().getMessage());
+                    return;
+                }
 
-            // Update session with evaluation ID and status
-            session.completeAnalysis(evaluation.getId().getValue());
-            sessionRepository.save(session);
+                transcription = transcriptionResult.getValue();
 
-            log.info("Evaluation completed successfully: {}", evaluationId);
+                try {
+                    String segmentsJson = objectMapper.writeValueAsString(transcription.segments());
+                    evaluation.completeTranscription(
+                            transcription.fullText(),
+                            segmentsJson,
+                            transcription.durationSeconds(),
+                            transcription.detectedLanguage());
+                    evaluationRepository.save(evaluation);
+                } catch (JsonProcessingException e) {
+                    failEvaluation(evaluationId, "Failed to serialize transcription");
+                    return;
+                }
+            }
 
-        } catch (JsonProcessingException e) {
-            failEvaluation(evaluationId, "Failed to serialize analysis results");
+            // Step 2: Analysis
+            log.info("Starting analysis for evaluation: {}", evaluationId);
+            var analysisResult = speechAnalysisService.analyze(transcription, session.getSessionType().getName());
+
+            if (analysisResult.isFailure()) {
+                failEvaluation(evaluationId, "Analysis failed: " + analysisResult.getError().getMessage());
+                return;
+            }
+
+            var analysis = analysisResult.getValue();
+
+            try {
+                String metricsJson = objectMapper.writeValueAsString(analysis.metrics());
+                String feedbackJson = objectMapper.writeValueAsString(analysis.feedbackNotes());
+                String strengthsJson = objectMapper.writeValueAsString(analysis.strengths());
+                String improvementsJson = objectMapper.writeValueAsString(analysis.areasForImprovement());
+
+                evaluation.completeAnalysis(
+                        analysis.metrics().wordsPerMinute(),
+                        analysis.metrics().totalWords(),
+                        analysis.metrics().fillerWordCount(),
+                        analysis.metrics().pauseCount(),
+                        analysis.metrics().clarityScore(),
+                        metricsJson,
+                        feedbackJson,
+                        analysis.overallSummary(),
+                        strengthsJson,
+                        improvementsJson);
+                evaluationRepository.save(evaluation);
+
+                // Update session with evaluation ID and status
+                session.completeAnalysis(evaluation.getId().getValue());
+                sessionRepository.save(session);
+
+                log.info("Evaluation completed successfully: {}", evaluationId);
+
+            } catch (JsonProcessingException e) {
+                failEvaluation(evaluationId, "Failed to serialize analysis results");
+            }
+        } finally {
+            storageService.cleanupTemporaryFile(mediaPath);
         }
     }
 

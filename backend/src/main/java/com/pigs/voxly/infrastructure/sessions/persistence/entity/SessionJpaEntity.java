@@ -1,8 +1,12 @@
 package com.pigs.voxly.infrastructure.sessions.persistence.entity;
 
-import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "sessions")
@@ -45,13 +49,17 @@ public class SessionJpaEntity {
     @Column(name = "evaluation_id")
     private UUID evaluationId;
 
+    @Column(name = "language", length = 10)
+    private String language;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     @Column(name = "modified_at")
     private Instant modifiedAt;
 
-    public SessionJpaEntity() {}
+    public SessionJpaEntity() {
+    }
 
     public UUID getId() {
         return id;
@@ -147,6 +155,14 @@ public class SessionJpaEntity {
 
     public void setEvaluationId(UUID evaluationId) {
         this.evaluationId = evaluationId;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
     }
 
     public Instant getCreatedAt() {

@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.3'
+    id 'org.springframework.boot' version '4.0.5'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -25,7 +25,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+    developmentOnly 'me.paulschwarz:springboot4-dotenv:4.0.0'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -34,6 +34,25 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'org.springframework.boot:spring-boot-starter-quartz'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    
+    // AWS SDK for Cloudflare R2 (S3-compatible)
+    implementation 'software.amazon.awssdk:s3:2.24.0'
+    implementation 'software.amazon.awssdk:sts:2.24.0'
+    
+    // OpenAI API Client
+    implementation 'com.aallam.openai:openai-client:3.7.0'
+    
+    // Async processing
+    implementation 'io.github.openfeign:feign-core:13.1'
+    
+    // JSON processing
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.16.1'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.1'
+    
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'

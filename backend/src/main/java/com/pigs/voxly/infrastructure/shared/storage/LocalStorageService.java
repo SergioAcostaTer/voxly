@@ -1,13 +1,5 @@
 package com.pigs.voxly.infrastructure.shared.storage;
 
-import com.pigs.voxly.application.shared.ports.StorageService;
-import com.pigs.voxly.sharedKernel.domain.results.Error;
-import com.pigs.voxly.sharedKernel.domain.results.Result;
-import com.pigs.voxly.sharedKernel.domain.results.ResultT;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -17,7 +9,18 @@ import java.nio.file.StandardCopyOption;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+
+import com.pigs.voxly.application.shared.ports.StorageService;
+import com.pigs.voxly.sharedKernel.domain.results.Error;
+import com.pigs.voxly.sharedKernel.domain.results.Result;
+import com.pigs.voxly.sharedKernel.domain.results.ResultT;
+
 @Service
+@ConditionalOnProperty(name = "app.storage.type", havingValue = "local")
 public class LocalStorageService implements StorageService {
 
     private static final Logger log = LoggerFactory.getLogger(LocalStorageService.class);
