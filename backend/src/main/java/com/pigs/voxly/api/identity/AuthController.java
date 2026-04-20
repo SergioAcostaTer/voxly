@@ -73,15 +73,15 @@ public class AuthController {
     @PostMapping("/logout")
     @Operation(summary = "Logout by revoking cookie token")
     public ResponseEntity<ApiResponse<Void>> logout(
-            @CookieValue(name = "access_token", required = false) String accessTokenCookie) {
+            @CookieValue(name = AccessTokenCookieHelper.COOKIE_NAME, required = false) String refreshTokenCookie) {
 
-        if (accessTokenCookie == null || accessTokenCookie.isBlank()) {
+        if (refreshTokenCookie == null || refreshTokenCookie.isBlank()) {
             return ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, cookieHelper.clearCookie().toString())
                     .body(ApiResponse.ok());
         }
 
-        var result = authService.logout(accessTokenCookie);
+        var result = authService.logout(refreshTokenCookie);
 
         return ResponseEntity.status(result.isSuccess() ? HttpStatus.OK : HttpStatus.OK)
                 .header(HttpHeaders.SET_COOKIE, cookieHelper.clearCookie().toString())
@@ -91,7 +91,7 @@ public class AuthController {
     @PostMapping("/refresh-token")
     @Operation(summary = "Issue a new access token using the cookie token")
     public ResponseEntity<ApiResponse<AccessTokenResponse>> issueAccessToken(
-            @CookieValue(name = "access_token", required = false) String accessTokenCookie) {
+            @CookieValue(name = AccessTokenCookieHelper.COOKIE_NAME, required = false) String refreshTokenCookie) {
 
         if (testingOpenAccess) {
             var testingToken = new AccessTokenResponse("testing-bypass", Instant.now().plusSeconds(3600));
@@ -100,12 +100,12 @@ public class AuthController {
                     .body(ApiResponse.ok(testingToken));
         }
 
-        if (accessTokenCookie == null || accessTokenCookie.isBlank()) {
+        if (refreshTokenCookie == null || refreshTokenCookie.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("AUTH.ACCESS_TOKEN_MISSING", "No access token cookie provided."));
+                    .body(ApiResponse.error("AUTH.REFRESH_TOKEN_MISSING", "No refresh token cookie provided."));
         }
 
-        var result = authService.refreshToken(accessTokenCookie);
+        var result = authService.refreshToken(refreshTokenCookie);
 
         if (result.isFailure()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

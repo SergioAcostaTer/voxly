@@ -1,6 +1,7 @@
 package com.pigs.voxly.application.sessions;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -10,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.pigs.voxly.application.evaluation.EvaluationService;
 import com.pigs.voxly.application.identity.ports.CurrentUserProvider;
 import com.pigs.voxly.application.sessions.dto.CreateSessionRequest;
+import com.pigs.voxly.application.sessions.dto.RecordingUploadResponse;
 import com.pigs.voxly.application.sessions.dto.SessionListResponse;
 import com.pigs.voxly.application.sessions.dto.SessionResponse;
 import com.pigs.voxly.application.sessions.dto.UpdateSessionRequest;
@@ -35,16 +37,22 @@ public class SessionService {
     private final StorageService storageService;
     private final CurrentUserProvider currentUserProvider;
     private final EvaluationService evaluationService;
+    private final SessionStatusStreamService sessionStatusStreamService;
+    private final RecordingUploadService recordingUploadService;
 
     public SessionService(
             SessionRepository sessionRepository,
             StorageService storageService,
             CurrentUserProvider currentUserProvider,
-            EvaluationService evaluationService) {
+            EvaluationService evaluationService,
+            SessionStatusStreamService sessionStatusStreamService,
+            RecordingUploadService recordingUploadService) {
         this.sessionRepository = sessionRepository;
         this.storageService = storageService;
         this.currentUserProvider = currentUserProvider;
         this.evaluationService = evaluationService;
+        this.sessionStatusStreamService = sessionStatusStreamService;
+        this.recordingUploadService = recordingUploadService;
     }
 
     @Transactional
@@ -74,6 +82,7 @@ public class SessionService {
 
         var session = sessionResult.getValue();
         sessionRepository.save(session);
+        sessionStatusStreamService.publishSessionUpdate(session);
 
         return ResultT.success(SessionResponse.fromDomain(session));
     }
@@ -115,7 +124,102 @@ public class SessionService {
         }
 
         sessionRepository.save(session);
+        sessionStatusStreamService.publishSessionUpdate(session);
         return ResultT.success(SessionResponse.fromDomain(session));
+    }
+
+    @Transactional
+    public ResultT<SessionResponse> createSessionWithRecordingUpload(CreateSessionRequest request, UUID uploadId) {
+        var userIdOpt = currentUserProvider.getUserId();
+        if (userIdOpt.isEmpty()) {
+            return ResultT.failure(SessionErrors.NOT_OWNER);
+        }
+
+        var upload = recordingUploadService.getOwnedCompletedUpload(userIdOpt.get(), uploadId);
+
+        var titleResult = SessionTitle.create(request.title());
+        if (titleResult.isFailure()) {
+            return ResultT.failure(titleResult.getError());
+        }
+
+        var validationResult = validateUploadedMedia(
+                upload.originalFileName(),
+                upload.contentType(),
+                upload.sizeBytes()
+        );
+        if (validationResult.isFailure()) {
+            return ResultT.failure(validationResult.getError());
+        }
+
+        var sessionType = SessionType.fromName(request.sessionType());
+        var sessionResult = Session.create(
+                UserId.from(userIdOpt.get()),
+                titleResult.getValue(),
+                request.description(),
+                sessionType,
+                request.language());
+
+        if (sessionResult.isFailure()) {
+            return ResultT.failure(sessionResult.getError());
+        }
+
+        var session = sessionResult.getValue();
+        var attachResult = storeAndAttachMedia(
+                session,
+                upload.path(),
+                upload.originalFileName(),
+                upload.contentType(),
+                upload.sizeBytes()
+        );
+        if (attachResult.isFailure()) {
+            return ResultT.failure(attachResult.getError());
+        }
+
+        sessionRepository.save(session);
+        sessionStatusStreamService.publishSessionUpdate(session);
+        recordingUploadService.consumeUpload(userIdOpt.get(), uploadId);
+        return ResultT.success(SessionResponse.fromDomain(session));
+    }
+
+    public RecordingUploadResponse createRecordingUpload(String originalFileName, String contentType) throws IOException {
+        var userIdOpt = currentUserProvider.getUserId();
+        if (userIdOpt.isEmpty()) {
+            throw new IllegalStateException("Authenticated user is required");
+        }
+
+        var upload = recordingUploadService.createUpload(userIdOpt.get(), originalFileName, contentType);
+        return new RecordingUploadResponse(
+                upload.uploadId(),
+                upload.sizeBytes(),
+                upload.nextSequence(),
+                upload.completed(),
+                upload.modifiedAt()
+        );
+    }
+
+    public RecordingUploadResponse appendRecordingChunk(UUID uploadId, MultipartFile chunk, int sequence, boolean isLastChunk)
+            throws IOException {
+        var userIdOpt = currentUserProvider.getUserId();
+        if (userIdOpt.isEmpty()) {
+            throw new IllegalStateException("Authenticated user is required");
+        }
+
+        var upload = recordingUploadService.appendChunk(userIdOpt.get(), uploadId, chunk, sequence, isLastChunk);
+        return new RecordingUploadResponse(
+                upload.uploadId(),
+                upload.sizeBytes(),
+                upload.nextSequence(),
+                upload.completed(),
+                upload.modifiedAt()
+        );
+    }
+
+    public void deleteRecordingUpload(UUID uploadId) {
+        var userIdOpt = currentUserProvider.getUserId();
+        if (userIdOpt.isEmpty()) {
+            throw new IllegalStateException("Authenticated user is required");
+        }
+        recordingUploadService.deleteUpload(userIdOpt.get(), uploadId);
     }
 
     public ResultT<SessionResponse> getSession(UUID sessionId) {
@@ -183,6 +287,7 @@ public class SessionService {
         }
 
         sessionRepository.save(session);
+        sessionStatusStreamService.publishSessionUpdate(session);
         return ResultT.success(SessionResponse.fromDomain(session));
     }
 
@@ -214,6 +319,7 @@ public class SessionService {
         }
 
         sessionRepository.save(session);
+        sessionStatusStreamService.publishSessionUpdate(session);
         return ResultT.success(SessionResponse.fromDomain(session));
     }
 
@@ -268,6 +374,7 @@ public class SessionService {
 
         if (result.isSuccess()) {
             sessionRepository.save(session);
+            sessionStatusStreamService.publishSessionUpdate(session);
 
             // Detached, idempotent pipeline start; processing continues after page reloads.
             var evaluationResult = evaluationService.startEvaluation(sessionId);
@@ -280,47 +387,63 @@ public class SessionService {
     }
 
     private Result validateMediaFile(MultipartFile file) {
-        var contentType = file.getContentType();
-        var normalizedFileName = normalizeUploadedFileName(file.getOriginalFilename(), contentType);
+        return validateUploadedMedia(file.getOriginalFilename(), file.getContentType(), file.getSize());
+    }
+
+    private Result validateUploadedMedia(String originalFileName, String contentType, long sizeBytes) {
+        var normalizedFileName = normalizeUploadedFileName(originalFileName, contentType);
         boolean isAudioUpload = FileValidator.isAudioContentType(contentType)
                 || (!FileValidator.isVideoContentType(contentType)
-                        && FileValidator.isAudioFileName(normalizedFileName));
+                && FileValidator.isAudioFileName(normalizedFileName));
         return isAudioUpload
-                ? FileValidator.validateAudio(normalizedFileName, contentType, file.getSize())
-                : FileValidator.validateVideo(normalizedFileName, contentType, file.getSize());
+                ? FileValidator.validateAudio(normalizedFileName, contentType, sizeBytes)
+                : FileValidator.validateVideo(normalizedFileName, contentType, sizeBytes);
     }
 
     private Result storeAndAttachMedia(Session session, MultipartFile file) {
         try {
-            var directory = "sessions/" + session.getId().getValue();
-            var normalizedFileName = normalizeUploadedFileName(file.getOriginalFilename(), file.getContentType());
-            var storeResult = storageService.store(
-                    file.getInputStream(),
-                    normalizedFileName,
-                    file.getContentType(),
-                    directory);
-
-            if (storeResult.isFailure()) {
-                return Result.failure(storeResult.getError());
-            }
-
-            var mediaFile = MediaFile.create(
-                    storeResult.getValue(),
-                    normalizedFileName,
-                    file.getContentType(),
-                    file.getSize());
-
-            var uploadResult = session.uploadMedia(mediaFile);
-            if (uploadResult.isFailure()) {
-                storageService.delete(storeResult.getValue());
-                return Result.failure(uploadResult.getError());
-            }
-
-            return Result.success();
+            return storeAndAttachMedia(session, file.getInputStream(), file.getOriginalFilename(), file.getContentType(), file.getSize());
         } catch (IOException e) {
             return Result.failure(com.pigs.voxly.sharedKernel.domain.results.Error.failure(
                     "Session.UploadFailed", "Failed to upload media: " + e.getMessage()));
         }
+    }
+
+    private Result storeAndAttachMedia(Session session, java.nio.file.Path sourcePath, String originalFileName, String contentType, long sizeBytes) {
+        try (var inputStream = Files.newInputStream(sourcePath)) {
+            return storeAndAttachMedia(session, inputStream, originalFileName, contentType, sizeBytes);
+        } catch (IOException e) {
+            return Result.failure(com.pigs.voxly.sharedKernel.domain.results.Error.failure(
+                    "Session.UploadFailed", "Failed to upload media: " + e.getMessage()));
+        }
+    }
+
+    private Result storeAndAttachMedia(Session session, java.io.InputStream inputStream, String originalFileName, String contentType, long sizeBytes) {
+        var directory = "sessions/" + session.getId().getValue();
+        var normalizedFileName = normalizeUploadedFileName(originalFileName, contentType);
+        var storeResult = storageService.store(
+                inputStream,
+                normalizedFileName,
+                contentType,
+                directory);
+
+        if (storeResult.isFailure()) {
+            return Result.failure(storeResult.getError());
+        }
+
+        var mediaFile = MediaFile.create(
+                storeResult.getValue(),
+                normalizedFileName,
+                contentType,
+                sizeBytes);
+
+        var uploadResult = session.uploadMedia(mediaFile);
+        if (uploadResult.isFailure()) {
+            storageService.delete(storeResult.getValue());
+            return Result.failure(uploadResult.getError());
+        }
+
+        return Result.success();
     }
 
     private String normalizeUploadedFileName(String originalFileName, String contentType) {

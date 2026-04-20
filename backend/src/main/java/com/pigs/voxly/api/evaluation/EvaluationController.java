@@ -25,6 +25,7 @@ import com.pigs.voxly.application.evaluation.EvaluationService;
 import com.pigs.voxly.application.evaluation.TranscriptionService;
 import com.pigs.voxly.application.evaluation.dto.EvaluationResponse;
 import com.pigs.voxly.domain.evaluation.Transcription;
+import com.pigs.voxly.infrastructure.shared.rateLimit.AnalysisRateLimiter;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -45,12 +46,15 @@ public class EvaluationController {
 
     private final EvaluationService evaluationService;
     private final TranscriptionService transcriptionService;
+    private final AnalysisRateLimiter analysisRateLimiter;
 
     public EvaluationController(
             EvaluationService evaluationService,
-            TranscriptionService transcriptionService) {
+            TranscriptionService transcriptionService,
+            AnalysisRateLimiter analysisRateLimiter) {
         this.evaluationService = evaluationService;
         this.transcriptionService = transcriptionService;
+        this.analysisRateLimiter = analysisRateLimiter;
     }
 
     @GetMapping("/{evaluationId}")
@@ -89,6 +93,7 @@ public class EvaluationController {
 
         try {
             UUID userId = UUID.fromString(authentication.getName());
+            analysisRateLimiter.checkAllowed(userId);
 
             // Validate file
             if (file == null || file.isEmpty()) {

@@ -33,6 +33,7 @@ public class EvaluationMapper {
                 entity.getStrengthsJson(),
                 entity.getImprovementsJson(),
                 entity.getErrorMessage(),
+                entity.getProcessingStartedAt(),
                 entity.getCreatedAt(),
                 entity.getCompletedAt()
         );
@@ -60,6 +61,7 @@ public class EvaluationMapper {
         entity.setStrengthsJson(evaluation.getStrengthsJson());
         entity.setImprovementsJson(evaluation.getImprovementsJson());
         entity.setErrorMessage(evaluation.getErrorMessage());
+        entity.setProcessingStartedAt(evaluation.getProcessingStartedAt());
         entity.setCreatedAt(evaluation.getCreatedAt());
         entity.setCompletedAt(evaluation.getCompletedAt());
         return entity;

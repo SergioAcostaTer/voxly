@@ -25,24 +25,37 @@ export const TranscriptionUploadComponent: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [pollingActive, setPollingActive] = useState(false);
 
-  // Fetch transcription status
+  // Stream transcription status
   useEffect(() => {
     if (!pollingActive || !sessionId || !accessToken) return;
 
-    const pollInterval = setInterval(async () => {
-      try {
-        const data = await api.getTranscription(accessToken, sessionId);
-        setTranscription(data);
+    const abortController = new AbortController();
 
-        if (data.status === 'COMPLETED' || data.status === 'FAILED') {
-          setPollingActive(false);
+    void api.streamSessionEvents(
+      accessToken,
+      sessionId,
+      async ({ event }) => {
+        if (event === 'status' || event === 'connected') {
+          try {
+            const data = await api.getTranscription(accessToken, sessionId);
+            setTranscription(data);
+
+            if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+              setPollingActive(false);
+            }
+          } catch (err) {
+            console.error('Error streaming transcription:', err);
+          }
         }
-      } catch (err) {
-        console.error('Error polling transcription:', err);
+      },
+      abortController.signal,
+    ).catch((err) => {
+      if (!abortController.signal.aborted) {
+        console.error('Error opening transcription stream:', err);
       }
-    }, 3000); // Poll every 3 seconds
+    });
 
-    return () => clearInterval(pollInterval);
+    return () => abortController.abort();
   }, [pollingActive, sessionId, accessToken]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

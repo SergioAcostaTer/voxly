@@ -2,6 +2,7 @@ package com.pigs.voxly.application.evaluation;
 
 import com.pigs.voxly.application.evaluation.dto.EvaluationResponse;
 import com.pigs.voxly.application.identity.ports.CurrentUserProvider;
+import com.pigs.voxly.application.sessions.SessionStatusStreamService;
 import com.pigs.voxly.domain.evaluation.Evaluation;
 import com.pigs.voxly.domain.evaluation.EvaluationErrors;
 import com.pigs.voxly.domain.evaluation.EvaluationId;
@@ -24,17 +25,20 @@ public class EvaluationService {
     private final SessionRepository sessionRepository;
     private final CurrentUserProvider currentUserProvider;
     private final EvaluationProcessor evaluationProcessor;
+    private final SessionStatusStreamService sessionStatusStreamService;
 
     public EvaluationService(
             EvaluationRepository evaluationRepository,
             SessionRepository sessionRepository,
             CurrentUserProvider currentUserProvider,
-            EvaluationProcessor evaluationProcessor
+            EvaluationProcessor evaluationProcessor,
+            SessionStatusStreamService sessionStatusStreamService
     ) {
         this.evaluationRepository = evaluationRepository;
         this.sessionRepository = sessionRepository;
         this.currentUserProvider = currentUserProvider;
         this.evaluationProcessor = evaluationProcessor;
+        this.sessionStatusStreamService = sessionStatusStreamService;
     }
 
     public ResultT<EvaluationResponse> getEvaluation(UUID evaluationId) {
@@ -121,6 +125,7 @@ public class EvaluationService {
 
         var evaluation = evalResult.getValue();
         evaluationRepository.save(evaluation);
+        sessionStatusStreamService.publishEvaluationUpdate(evaluation);
 
         // Trigger async processing
         evaluationProcessor.processAsync(evaluation.getId().getValue());

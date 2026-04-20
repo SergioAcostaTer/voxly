@@ -107,6 +107,7 @@ export function SessionDetailPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null)
   const [isLivePolling, setIsLivePolling] = useState(false)
+  const streamAbortRef = useRef<AbortController | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!accessToken || !sessionId) return
@@ -165,7 +166,6 @@ export function SessionDetailPage() {
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
-      setIsLivePolling(false)
     }
   }, [accessToken, sessionId, logout, navigate])
 
@@ -193,16 +193,38 @@ export function SessionDetailPage() {
 
   useEffect(() => {
     if (!shouldPoll) {
+      streamAbortRef.current?.abort()
+      streamAbortRef.current = null
+      setIsLivePolling(false)
       return
     }
 
+    const abortController = new AbortController()
+    streamAbortRef.current = abortController
     setIsLivePolling(true)
-    const interval = setInterval(() => {
-      void fetchData()
-    }, 3500)
 
-    return () => clearInterval(interval)
-  }, [shouldPoll, fetchData])
+    void api.streamSessionEvents(
+      accessToken!,
+      sessionId!,
+      async ({ event }) => {
+        if (event === 'status' || event === 'connected') {
+          await fetchData()
+        }
+      },
+      abortController.signal,
+    ).catch(() => {
+      if (!abortController.signal.aborted) {
+        setIsLivePolling(false)
+      }
+    })
+
+    return () => {
+      abortController.abort()
+      if (streamAbortRef.current === abortController) {
+        streamAbortRef.current = null
+      }
+    }
+  }, [shouldPoll, fetchData, accessToken, sessionId])
 
   function handleRefresh() {
     setIsRefreshing(true)

@@ -10,7 +10,7 @@ import com.pigs.voxly.infrastructure.identity.config.JwtProperties;
 @Component
 public class AccessTokenCookieHelper {
 
-    static final String COOKIE_NAME = "access_token";
+    public static final String COOKIE_NAME = "refresh_token";
     private static final String COOKIE_PATH = "/v1/auth";
 
     private final JwtProperties jwtProperties;
@@ -19,8 +19,8 @@ public class AccessTokenCookieHelper {
         this.jwtProperties = jwtProperties;
     }
 
-    public ResponseCookie createCookie(String accessToken) {
-        return ResponseCookie.from(COOKIE_NAME, accessToken)
+    public ResponseCookie createCookie(String refreshToken) {
+        return ResponseCookie.from(COOKIE_NAME, refreshToken)
                 .httpOnly(true)
                 .secure(jwtProperties.accessCookieSecure())
                 .sameSite("Strict")

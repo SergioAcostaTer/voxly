@@ -30,3 +30,6 @@ app:
     dev-password: test123
   ai:
     provider: ${AI_PROVIDER:openai}
+  analysis:
+    rate-limit:
+      enabled: ${ANALYSIS_RATE_LIMIT_ENABLED:true}

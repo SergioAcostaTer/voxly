@@ -39,6 +39,7 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
 
     // Error handling
     private String errorMessage;
+    private Instant processingStartedAt;
 
     // Timestamps
     private Instant createdAt;
@@ -84,6 +85,7 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
             String strengthsJson,
             String improvementsJson,
             String errorMessage,
+            Instant processingStartedAt,
             Instant createdAt,
             Instant completedAt
     ) {
@@ -108,6 +110,7 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
         evaluation.strengthsJson = strengthsJson;
         evaluation.improvementsJson = improvementsJson;
         evaluation.errorMessage = errorMessage;
+        evaluation.processingStartedAt = processingStartedAt;
         evaluation.createdAt = createdAt;
         evaluation.completedAt = completedAt;
         return evaluation;
@@ -120,6 +123,7 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
             return Result.failure(EvaluationErrors.ALREADY_COMPLETED);
         }
         this.status = EvaluationStatus.TRANSCRIBING;
+        this.processingStartedAt = Instant.now();
         return Result.success();
     }
 
@@ -134,6 +138,7 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
         this.durationSeconds = durationSeconds;
         this.detectedLanguage = detectedLanguage;
         this.status = EvaluationStatus.ANALYZING;
+        this.processingStartedAt = Instant.now();
         return Result.success();
     }
 
@@ -160,6 +165,7 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
         this.strengthsJson = strengthsJson;
         this.improvementsJson = improvementsJson;
         this.status = EvaluationStatus.COMPLETED;
+        this.processingStartedAt = null;
         this.completedAt = Instant.now();
         return Result.success();
     }
@@ -167,8 +173,19 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
     public Result fail(String errorMessage) {
         this.status = EvaluationStatus.FAILED;
         this.errorMessage = truncate(errorMessage, MAX_ERROR_MESSAGE_LENGTH);
+        this.processingStartedAt = null;
         this.completedAt = Instant.now();
         return Result.success();
+    }
+
+    public boolean isProcessingStale(Instant cutoff) {
+        if (status == EvaluationStatus.PENDING) {
+            return true;
+        }
+        if (status != EvaluationStatus.TRANSCRIBING && status != EvaluationStatus.ANALYZING) {
+            return false;
+        }
+        return processingStartedAt == null || processingStartedAt.isBefore(cutoff);
     }
 
     private String truncate(String value, int maxLength) {
@@ -254,6 +271,10 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
 
     public String getErrorMessage() {
         return errorMessage;
+    }
+
+    public Instant getProcessingStartedAt() {
+        return processingStartedAt;
     }
 
     public Instant getCreatedAt() {

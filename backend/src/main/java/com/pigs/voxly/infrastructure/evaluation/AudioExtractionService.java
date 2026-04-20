@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class AudioExtractionService {
@@ -25,6 +26,12 @@ public class AudioExtractionService {
 
     @Value("${storage.ffmpeg.audio-samplerate:16000}")
     private String audioSampleRate;
+
+    @Value("${storage.ffmpeg.timeout-seconds:120}")
+    private long ffmpegTimeoutSeconds;
+
+    @Value("${storage.ffmpeg.probe-timeout-seconds:15}")
+    private long ffprobeTimeoutSeconds;
 
     /**
      * Extract audio from video file using FFmpeg
@@ -54,7 +61,13 @@ public class AudioExtractionService {
             Process process = processBuilder.start();
 
             // Wait for completion
-            int exitCode = process.waitFor();
+            boolean finished = process.waitFor(ffmpegTimeoutSeconds, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                throw new IOException("FFmpeg extraction timed out after " + ffmpegTimeoutSeconds + " seconds");
+            }
+
+            int exitCode = process.exitValue();
             if (exitCode != 0) {
                 logger.error("FFmpeg extraction failed with code: {}", exitCode);
                 throw new IOException("FFmpeg extraction failed with code: " + exitCode);
@@ -90,7 +103,14 @@ public class AudioExtractionService {
 
             Process process = processBuilder.start();
             byte[] output = process.getInputStream().readAllBytes();
-            int exitCode = process.waitFor();
+            boolean finished = process.waitFor(ffprobeTimeoutSeconds, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                logger.warn("FFprobe timed out after {} seconds", ffprobeTimeoutSeconds);
+                return 0;
+            }
+
+            int exitCode = process.exitValue();
 
             if (exitCode == 0 && output.length > 0) {
                 String durationStr = new String(output).trim();

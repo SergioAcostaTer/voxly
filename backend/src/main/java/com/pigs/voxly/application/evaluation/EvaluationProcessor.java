@@ -3,6 +3,7 @@ package com.pigs.voxly.application.evaluation;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pigs.voxly.application.sessions.SessionStatusStreamService;
 import com.pigs.voxly.application.shared.ports.SpeechAnalysisService;
 import com.pigs.voxly.application.shared.ports.StorageService;
 import com.pigs.voxly.application.shared.ports.TranscriptionService;
@@ -30,6 +32,8 @@ public class EvaluationProcessor {
     private final SpeechAnalysisService speechAnalysisService;
     private final StorageService storageService;
     private final ObjectMapper objectMapper;
+    private final SessionStatusStreamService sessionStatusStreamService;
+    private final ConcurrentHashMap<UUID, Boolean> activeEvaluations = new ConcurrentHashMap<>();
 
     public EvaluationProcessor(
             EvaluationRepository evaluationRepository,
@@ -37,18 +41,25 @@ public class EvaluationProcessor {
             TranscriptionService transcriptionService,
             SpeechAnalysisService speechAnalysisService,
             StorageService storageService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            SessionStatusStreamService sessionStatusStreamService) {
         this.evaluationRepository = evaluationRepository;
         this.sessionRepository = sessionRepository;
         this.transcriptionService = transcriptionService;
         this.speechAnalysisService = speechAnalysisService;
         this.storageService = storageService;
         this.objectMapper = objectMapper;
+        this.sessionStatusStreamService = sessionStatusStreamService;
     }
 
     @Async("analysisExecutor")
     @Transactional
     public void processAsync(UUID evaluationId) {
+        if (activeEvaluations.putIfAbsent(evaluationId, Boolean.TRUE) != null) {
+            log.info("Skipping async evaluation processing for {} because it is already active", evaluationId);
+            return;
+        }
+
         log.info("Starting async evaluation processing for: {}", evaluationId);
 
         try {
@@ -56,6 +67,8 @@ public class EvaluationProcessor {
         } catch (Exception e) {
             log.error("Failed to process evaluation: {}", evaluationId, e);
             failEvaluation(evaluationId, e.getMessage());
+        } finally {
+            activeEvaluations.remove(evaluationId);
         }
     }
 
@@ -108,6 +121,7 @@ public class EvaluationProcessor {
                 }
 
                 evaluationRepository.save(evaluation);
+                sessionStatusStreamService.publishEvaluationUpdate(evaluation);
 
                 var transcriptionResult = transcriptionService.transcribe(mediaPath, session.getLanguage());
 
@@ -127,6 +141,7 @@ public class EvaluationProcessor {
                             transcription.durationSeconds(),
                             transcription.detectedLanguage());
                     evaluationRepository.save(evaluation);
+                    sessionStatusStreamService.publishEvaluationUpdate(evaluation);
                 } catch (JsonProcessingException e) {
                     failEvaluation(evaluationId, "Failed to serialize transcription");
                     return;
@@ -166,6 +181,8 @@ public class EvaluationProcessor {
                 // Update session with evaluation ID and status
                 session.completeAnalysis(evaluation.getId().getValue());
                 sessionRepository.save(session);
+                sessionStatusStreamService.publishEvaluationUpdate(evaluation);
+                sessionStatusStreamService.publishSessionUpdate(session);
 
                 log.info("Evaluation completed successfully: {}", evaluationId);
 
@@ -183,6 +200,7 @@ public class EvaluationProcessor {
             var evaluation = evaluationOpt.get();
             evaluation.fail(errorMessage);
             evaluationRepository.save(evaluation);
+            sessionStatusStreamService.publishEvaluationUpdate(evaluation);
 
             // Also update session status
             var sessionOpt = sessionRepository.findById(evaluation.getSessionId());
@@ -190,6 +208,7 @@ public class EvaluationProcessor {
                 var session = sessionOpt.get();
                 session.failAnalysis();
                 sessionRepository.save(session);
+                sessionStatusStreamService.publishSessionUpdate(session);
             }
         }
         log.error("Evaluation failed: {} - {}", evaluationId, errorMessage);
