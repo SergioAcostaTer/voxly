@@ -1,12 +1,12 @@
 package com.pigs.voxly.infrastructure.shared.ai;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.pigs.voxly.application.shared.ports.SpeechAnalysisService;
-import com.pigs.voxly.application.shared.ports.TranscriptionService;
-import com.pigs.voxly.sharedKernel.domain.results.Error;
-import com.pigs.voxly.sharedKernel.domain.results.ResultT;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -15,11 +15,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pigs.voxly.application.shared.ports.SpeechAnalysisService;
+import com.pigs.voxly.application.shared.ports.TranscriptionService;
+import com.pigs.voxly.sharedKernel.domain.results.Error;
+import com.pigs.voxly.sharedKernel.domain.results.ResultT;
 
 @Service
 @ConditionalOnProperty(name = "app.ai.provider", havingValue = "openai")
@@ -28,8 +30,7 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
     private static final Logger log = LoggerFactory.getLogger(OpenAiSpeechAnalysisService.class);
     private static final Pattern FILLER_PATTERN = Pattern.compile(
             "\\b(um|uh|like|basically|so|actually|you know|I mean|kind of|sort of)\\b",
-            Pattern.CASE_INSENSITIVE
-    );
+            Pattern.CASE_INSENSITIVE);
 
     private final RestClient restClient;
     private final AiProperties aiProperties;
@@ -46,9 +47,9 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
     @Override
     public ResultT<AnalysisResult> analyze(
             TranscriptionService.TranscriptionResult transcription,
-            String sessionType
-    ) {
-        log.info("Starting OpenAI analysis for {} session, duration: {}s", sessionType, transcription.durationSeconds());
+            String sessionType) {
+        log.info("Starting OpenAI analysis for {} session, duration: {}s", sessionType,
+                transcription.durationSeconds());
 
         String text = transcription.fullText();
         List<TranscriptionService.Segment> segments = transcription.segments();
@@ -69,14 +70,12 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
                 wordsPerMinute, totalWords, durationMinutes,
                 fillerWordCount, fillerWords,
                 pauses.size(), pauses,
-                avgSentenceLength, clarityScore
-        );
+                avgSentenceLength, clarityScore);
 
         if (aiProperties.apiKey() == null || aiProperties.apiKey().isBlank()) {
             return ResultT.failure(Error.failure(
                     "Analysis.OpenAiNotConfigured",
-                    "OPENAI_API_KEY is not configured"
-            ));
+                    "OPENAI_API_KEY is not configured"));
         }
 
         // Use GPT for qualitative feedback
@@ -88,8 +87,7 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
                     combineFeedbackNotes(fillerWords, pauses, gptFeedback.feedbackNotes),
                     gptFeedback.overallSummary,
                     gptFeedback.strengths,
-                    gptFeedback.areasForImprovement
-            );
+                    gptFeedback.areasForImprovement);
 
             log.info("OpenAI analysis completed: {} WPM, {} filler words, {} clarity",
                     wordsPerMinute, fillerWordCount, clarityScore);
@@ -100,16 +98,14 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
             log.error("GPT analysis failed", e);
             return ResultT.failure(Error.failure(
                     "Analysis.Failed",
-                    "OpenAI analysis failed: " + summarizeException(e)
-            ));
+                    "OpenAI analysis failed: " + summarizeException(e)));
         }
     }
 
     private GptFeedback getGptFeedback(
             TranscriptionService.TranscriptionResult transcription,
             String sessionType,
-            Metrics metrics
-    ) throws JsonProcessingException {
+            Metrics metrics) throws JsonProcessingException {
         String prompt = buildPrompt(transcription, sessionType, metrics);
 
         var requestBody = Map.of(
@@ -117,9 +113,7 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
                 "temperature", 0.7,
                 "messages", List.of(
                         Map.of("role", "system", "content", SYSTEM_PROMPT),
-                        Map.of("role", "user", "content", prompt)
-                )
-        );
+                        Map.of("role", "user", "content", prompt)));
 
         String chatUrl = aiProperties.baseUrl() + "/chat/completions";
 
@@ -141,43 +135,53 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
     private String buildPrompt(
             TranscriptionService.TranscriptionResult transcription,
             String sessionType,
-            Metrics metrics
-    ) {
-        return String.format("""
-                Analyze this %s transcription and provide feedback.
+            Metrics metrics) {
+        return String.format(
+                """
+                        Analyze this %s transcription and provide feedback.
 
-                **Metrics:**
-                - Words per minute: %d
-                - Total words: %d
-                - Filler words: %d
-                - Pauses: %d
-                - Duration: %.1f minutes
+                        **Metrics:**
+                        - Words per minute: %d
+                        - Total words: %d
+                        - Filler words: %d
+                        - Pauses: %d
+                        - Duration: %.1f minutes
 
-                **Transcription:**
-                %s
+                        **Transcription:**
+                        %s
 
-                Respond in this exact JSON format:
-                {
-                  "overallSummary": "2-3 sentence summary of the performance",
-                  "strengths": ["strength 1", "strength 2", "strength 3"],
-                  "areasForImprovement": ["improvement 1", "improvement 2"],
-                  "feedbackNotes": [
-                    {
-                      "category": "pacing|clarity|engagement|structure|content",
-                      "severity": "info|warning|suggestion",
-                      "message": "specific actionable feedback"
-                    }
-                  ]
-                }
-                """,
+                                        **Output requirements:**
+                                        - You are writing for Guided Coach Mode. Each note should read like a conversational coaching intervention.
+                                        - Keep tone friendly, first-person, and professional.
+                                        - Cluster nearby issues into a single feedback note when they happen within 10 seconds.
+                                        - Prefer timestamped notes whenever possible.
+                                        - Include specific timestamps in seconds when possible.
+
+                        Respond in this exact JSON format:
+                        {
+                          "overallSummary": "2-3 sentence summary of the performance",
+                          "strengths": ["strength 1", "strength 2", "strength 3"],
+                          "areasForImprovement": ["improvement 1", "improvement 2"],
+                          "feedbackNotes": [
+                            {
+                                                    "category": "pacing|filler|clarity|structure",
+                                                    "severity": "info|warning|critical",
+                                                    "timestampSeconds": 14.5,
+                                                    "endTimestampSeconds": 18.2,
+                                                    "title": "Short coaching title",
+                                                    "message": "specific actionable feedback",
+                                                    "coachScript": "First-person conversational coach explanation."
+                            }
+                          ]
+                        }
+                        """,
                 sessionType,
                 metrics.wordsPerMinute(),
                 metrics.totalWords(),
                 metrics.fillerWordCount(),
                 metrics.pauseCount(),
                 metrics.durationMinutes(),
-                transcription.fullText()
-        );
+                transcription.fullText());
     }
 
     private GptFeedback parseGptResponse(String content) throws JsonProcessingException {
@@ -209,8 +213,7 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
     private List<FeedbackNote> combineFeedbackNotes(
             List<FillerWordOccurrence> fillerWords,
             List<PauseOccurrence> pauses,
-            List<GptFeedbackNote> gptNotes
-    ) {
+            List<GptFeedbackNote> gptNotes) {
         List<FeedbackNote> notes = new ArrayList<>();
 
         // Timestamped filler word notes
@@ -218,8 +221,9 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
             notes.add(new FeedbackNote(
                     "filler", "warning",
                     "Filler word detected: \"" + filler.word() + "\"",
-                    filler.timestampSeconds(), null
-            ));
+                    filler.timestampSeconds(), null,
+                    "Filler word cluster",
+                    "I noticed a filler word here. A brief silent pause can sound more confident than filling space with extra words."));
         }
 
         // Timestamped pause notes
@@ -228,8 +232,9 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
                 notes.add(new FeedbackNote(
                         "pacing", "warning",
                         String.format("Long pause (%.1fs). Consider smoother transitions.", pause.durationSeconds()),
-                        pause.startSeconds(), pause.endSeconds()
-                ));
+                        pause.startSeconds(), pause.endSeconds(),
+                        "Long pause",
+                        "I noticed a longer pause here. A quick transition phrase can keep momentum while you gather your next thought."));
             }
         }
 
@@ -237,21 +242,49 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
         if (gptNotes != null) {
             for (var note : gptNotes) {
                 notes.add(new FeedbackNote(
-                        note.category != null ? note.category : "suggestion",
-                        note.severity != null ? note.severity : "info",
+                        normalizeCategory(note.category),
+                        normalizeSeverity(note.severity),
                         note.message,
-                        null, null
-                ));
+                        note.timestampSeconds,
+                        note.endTimestampSeconds,
+                        note.title,
+                        note.coachScript));
             }
         }
 
         return notes;
     }
 
+    private String normalizeCategory(String category) {
+        if (category == null || category.isBlank()) {
+            return "clarity";
+        }
+
+        String normalized = category.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "pacing", "filler", "clarity", "structure" -> normalized;
+            default -> "clarity";
+        };
+    }
+
+    private String normalizeSeverity(String severity) {
+        if (severity == null || severity.isBlank()) {
+            return "info";
+        }
+
+        String normalized = severity.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            // Keep backward compatibility with previously stored notes.
+            case "info", "warning", "critical", "suggestion" -> normalized;
+            default -> "info";
+        };
+    }
+
     // --- Local metric calculations (same as MockSpeechAnalysisService) ---
 
     private int countWords(String text) {
-        if (text == null || text.isBlank()) return 0;
+        if (text == null || text.isBlank())
+            return 0;
         return text.split("\\s+").length;
     }
 
@@ -272,23 +305,25 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
             double gap = segments.get(i).startSeconds() - segments.get(i - 1).endSeconds();
             if (gap >= 1.5) {
                 String type = gap > 3.0 ? "awkward" : (gap > 2.0 ? "natural" : "dramatic");
-                pauses.add(new PauseOccurrence(segments.get(i - 1).endSeconds(), segments.get(i).startSeconds(), gap, type));
+                pauses.add(new PauseOccurrence(segments.get(i - 1).endSeconds(), segments.get(i).startSeconds(), gap,
+                        type));
             }
         }
         return pauses;
     }
 
     private double calculateAverageSentenceLength(String text) {
-        if (text == null || text.isBlank()) return 0;
+        if (text == null || text.isBlank())
+            return 0;
         String[] sentences = text.split("[.!?]+");
         int total = 0;
-        for (String s : sentences) total += countWords(s.trim());
+        for (String s : sentences)
+            total += countWords(s.trim());
         return sentences.length > 0 ? (double) total / sentences.length : 0;
     }
 
     private double calculateClarityScore(int wpm, int fillerCount, int totalWords) {
-        double wpmScore = (wpm >= 120 && wpm <= 150) ? 1.0 :
-                (wpm < 100 || wpm > 180) ? 0.7 : 0.85;
+        double wpmScore = (wpm >= 120 && wpm <= 150) ? 1.0 : (wpm < 100 || wpm > 180) ? 0.7 : 0.85;
         double fillerRatio = totalWords > 0 ? (double) fillerCount / totalWords : 0;
         double fillerScore = Math.max(0, 1.0 - (fillerRatio * 10));
         return Math.round((wpmScore * 0.5 + fillerScore * 0.5) * 100) / 100.0;
@@ -329,6 +364,10 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
     private static class GptFeedbackNote {
         public String category;
         public String severity;
+        public Double timestampSeconds;
+        public Double endTimestampSeconds;
+        public String title;
         public String message;
+        public String coachScript;
     }
 }

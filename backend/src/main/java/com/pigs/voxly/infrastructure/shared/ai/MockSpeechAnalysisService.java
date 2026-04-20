@@ -1,17 +1,18 @@
 package com.pigs.voxly.infrastructure.shared.ai;
 
-import com.pigs.voxly.application.shared.ports.SpeechAnalysisService;
-import com.pigs.voxly.application.shared.ports.TranscriptionService;
-import com.pigs.voxly.sharedKernel.domain.results.ResultT;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.pigs.voxly.application.shared.ports.SpeechAnalysisService;
+import com.pigs.voxly.application.shared.ports.TranscriptionService;
+import com.pigs.voxly.sharedKernel.domain.results.ResultT;
 
 /**
  * Mock implementation of SpeechAnalysisService for development and testing.
@@ -25,14 +26,12 @@ public class MockSpeechAnalysisService implements SpeechAnalysisService {
 
     private static final Pattern FILLER_PATTERN = Pattern.compile(
             "\\b(um|uh|like|basically|so|actually|you know|I mean|kind of|sort of)\\b",
-            Pattern.CASE_INSENSITIVE
-    );
+            Pattern.CASE_INSENSITIVE);
 
     @Override
     public ResultT<AnalysisResult> analyze(
             TranscriptionService.TranscriptionResult transcription,
-            String sessionType
-    ) {
+            String sessionType) {
         log.info("Mock analysis for {} session, duration: {}s", sessionType, transcription.durationSeconds());
 
         String text = transcription.fullText();
@@ -66,8 +65,7 @@ public class MockSpeechAnalysisService implements SpeechAnalysisService {
                 pauseCount,
                 pauses,
                 avgSentenceLength,
-                clarityScore
-        );
+                clarityScore);
 
         // Generate feedback notes
         List<FeedbackNote> feedbackNotes = generateFeedbackNotes(metrics, segments, sessionType);
@@ -82,8 +80,7 @@ public class MockSpeechAnalysisService implements SpeechAnalysisService {
                 feedbackNotes,
                 overallSummary,
                 strengths,
-                areasForImprovement
-        );
+                areasForImprovement);
 
         log.info("Mock analysis completed: {} WPM, {} filler words, {} clarity score",
                 wordsPerMinute, fillerWordCount, clarityScore);
@@ -92,7 +89,8 @@ public class MockSpeechAnalysisService implements SpeechAnalysisService {
     }
 
     private int countWords(String text) {
-        if (text == null || text.isBlank()) return 0;
+        if (text == null || text.isBlank())
+            return 0;
         return text.split("\\s+").length;
     }
 
@@ -130,10 +128,14 @@ public class MockSpeechAnalysisService implements SpeechAnalysisService {
     private double calculateClarityScore(int wpm, int fillerCount, int totalWords) {
         // Ideal WPM is 120-150
         double wpmScore = 1.0;
-        if (wpm < 100) wpmScore = 0.7;
-        else if (wpm < 120) wpmScore = 0.85;
-        else if (wpm > 180) wpmScore = 0.7;
-        else if (wpm > 160) wpmScore = 0.85;
+        if (wpm < 100)
+            wpmScore = 0.7;
+        else if (wpm < 120)
+            wpmScore = 0.85;
+        else if (wpm > 180)
+            wpmScore = 0.7;
+        else if (wpm > 160)
+            wpmScore = 0.85;
 
         // Filler word penalty
         double fillerRatio = totalWords > 0 ? (double) fillerCount / totalWords : 0;
@@ -143,7 +145,8 @@ public class MockSpeechAnalysisService implements SpeechAnalysisService {
     }
 
     private double calculateAverageSentenceLength(String text) {
-        if (text == null || text.isBlank()) return 0;
+        if (text == null || text.isBlank())
+            return 0;
         String[] sentences = text.split("[.!?]+");
         int totalWords = 0;
         for (String sentence : sentences) {
@@ -155,8 +158,7 @@ public class MockSpeechAnalysisService implements SpeechAnalysisService {
     private List<FeedbackNote> generateFeedbackNotes(
             Metrics metrics,
             List<TranscriptionService.Segment> segments,
-            String sessionType
-    ) {
+            String sessionType) {
         List<FeedbackNote> notes = new ArrayList<>();
 
         // Filler word feedback
@@ -166,8 +168,9 @@ public class MockSpeechAnalysisService implements SpeechAnalysisService {
                     "WARNING",
                     "Filler word detected: \"" + filler.word() + "\"",
                     filler.timestampSeconds(),
-                    null
-            ));
+                    null,
+                    "Filler word cluster",
+                    "I heard filler words in this section. Try taking a silent breath instead to sound more composed."));
         }
 
         // Pause feedback
@@ -176,10 +179,13 @@ public class MockSpeechAnalysisService implements SpeechAnalysisService {
                 notes.add(new FeedbackNote(
                         "PAUSES",
                         "WARNING",
-                        String.format("Long pause detected (%.1f seconds). Consider filling with content or transitioning more smoothly.", pause.durationSeconds()),
+                        String.format(
+                                "Long pause detected (%.1f seconds). Consider filling with content or transitioning more smoothly.",
+                                pause.durationSeconds()),
                         pause.startSeconds(),
-                        pause.endSeconds()
-                ));
+                        pause.endSeconds(),
+                        "Long pause",
+                        "I noticed a long pause here. A short transition phrase can keep the audience with you."));
             }
         }
 
@@ -189,15 +195,17 @@ public class MockSpeechAnalysisService implements SpeechAnalysisService {
                     "PACING",
                     "INFO",
                     "Your speaking pace is slower than average. Consider picking up the pace slightly to maintain engagement.",
-                    null, null
-            ));
+                    null, null,
+                    "Pace is slow",
+                    "I can hear a slower pace in this section. Slightly increasing tempo can help maintain energy."));
         } else if (metrics.wordsPerMinute() > 170) {
             notes.add(new FeedbackNote(
                     "PACING",
                     "WARNING",
                     "Your speaking pace is faster than recommended. Slow down to improve clarity and comprehension.",
-                    null, null
-            ));
+                    null, null,
+                    "Pace is fast",
+                    "I noticed you sped up here. A calmer pace helps your key points land more clearly."));
         }
 
         // Clarity feedback
@@ -206,8 +214,9 @@ public class MockSpeechAnalysisService implements SpeechAnalysisService {
                     "CLARITY",
                     "CRITICAL",
                     "Clarity score is below average. Focus on reducing filler words and maintaining a steady pace.",
-                    null, null
-            ));
+                    null, null,
+                    "Clarity risk",
+                    "I want to help you tighten clarity here. Fewer fillers and steadier pacing will make your message stronger."));
         }
 
         // General suggestions
@@ -215,16 +224,18 @@ public class MockSpeechAnalysisService implements SpeechAnalysisService {
                 "SUGGESTION",
                 "INFO",
                 "Consider using more transitional phrases between topics to improve flow.",
-                null, null
-        ));
+                null, null,
+                "Transitions",
+                "I recommend adding clear transitions between ideas so listeners can follow your structure more easily."));
 
         if (metrics.fillerWordCount() > 5) {
             notes.add(new FeedbackNote(
                     "SUGGESTION",
                     "INFO",
                     "Practice pausing briefly instead of using filler words. Silent pauses can be powerful.",
-                    null, null
-            ));
+                    null, null,
+                    "Pause with intent",
+                    "I noticed repeated fillers. Replacing them with short silent pauses can sound much more confident."));
         }
 
         return notes;

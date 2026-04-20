@@ -1,8 +1,8 @@
 package com.pigs.voxly.application.shared.ports;
 
-import com.pigs.voxly.sharedKernel.domain.results.ResultT;
-
 import java.util.List;
+
+import com.pigs.voxly.sharedKernel.domain.results.ResultT;
 
 /**
  * Port interface for AI-powered speech analysis.
@@ -14,13 +14,13 @@ public interface SpeechAnalysisService {
      * Analyzes transcribed text and returns feedback notes.
      *
      * @param transcription the transcription result from TranscriptionService
-     * @param sessionType   the type of presentation (e.g., "presentation", "interview")
+     * @param sessionType   the type of presentation (e.g., "presentation",
+     *                      "interview")
      * @return ResultT containing analysis on success
      */
     ResultT<AnalysisResult> analyze(
             TranscriptionService.TranscriptionResult transcription,
-            String sessionType
-    );
+            String sessionType);
 
     /**
      * Represents the complete analysis result.
@@ -30,8 +30,8 @@ public interface SpeechAnalysisService {
             List<FeedbackNote> feedbackNotes,
             String overallSummary,
             List<String> strengths,
-            List<String> areasForImprovement
-    ) {}
+            List<String> areasForImprovement) {
+    }
 
     /**
      * Calculated presentation metrics.
@@ -45,8 +45,8 @@ public interface SpeechAnalysisService {
             int pauseCount,
             List<PauseOccurrence> pauses,
             double averageSentenceLength,
-            double clarityScore
-    ) {}
+            double clarityScore) {
+    }
 
     /**
      * A filler word occurrence with timestamp.
@@ -54,8 +54,8 @@ public interface SpeechAnalysisService {
     record FillerWordOccurrence(
             String word,
             double timestampSeconds,
-            int count
-    ) {}
+            int count) {
+    }
 
     /**
      * A pause occurrence with timing.
@@ -65,7 +65,8 @@ public interface SpeechAnalysisService {
             double endSeconds,
             double durationSeconds,
             String type // "natural", "awkward", "dramatic"
-    ) {}
+    ) {
+    }
 
     /**
      * A feedback note linked to a specific timestamp.
@@ -75,6 +76,8 @@ public interface SpeechAnalysisService {
             String severity, // INFO, WARNING, CRITICAL
             String message,
             Double timestampSeconds, // null for general notes
-            Double endTimestampSeconds
-    ) {}
+            Double endTimestampSeconds,
+            String title,
+            String coachScript) {
+    }
 }

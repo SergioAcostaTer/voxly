@@ -1,9 +1,14 @@
 package com.pigs.voxly.application.evaluation.dto;
 
-import com.pigs.voxly.domain.evaluation.Evaluation;
-
 import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pigs.voxly.application.shared.ports.TranscriptionService;
+import com.pigs.voxly.domain.evaluation.Evaluation;
 
 public record EvaluationResponse(
         UUID id,
@@ -15,16 +20,17 @@ public record EvaluationResponse(
         FeedbackData feedback,
         String errorMessage,
         Instant createdAt,
-        Instant completedAt
-) {
+        Instant completedAt) {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     public static EvaluationResponse fromDomain(Evaluation evaluation) {
         TranscriptionData transcription = null;
         if (evaluation.getTranscriptionText() != null) {
             transcription = new TranscriptionData(
                     evaluation.getTranscriptionText(),
+                    parseSegments(evaluation.getTranscriptionJson()),
                     evaluation.getDurationSeconds(),
-                    evaluation.getDetectedLanguage()
-            );
+                    evaluation.getDetectedLanguage());
         }
 
         MetricsData metrics = null;
@@ -34,16 +40,14 @@ public record EvaluationResponse(
                     evaluation.getTotalWords(),
                     evaluation.getFillerWordCount(),
                     evaluation.getPauseCount(),
-                    evaluation.getClarityScore()
-            );
+                    evaluation.getClarityScore());
         }
 
         FeedbackData feedback = null;
         if (evaluation.getOverallSummary() != null) {
             feedback = new FeedbackData(
                     evaluation.getOverallSummary(),
-                    evaluation.getFeedbackJson()
-            );
+                    evaluation.getFeedbackJson());
         }
 
         return new EvaluationResponse(
@@ -56,26 +60,54 @@ public record EvaluationResponse(
                 feedback,
                 evaluation.getErrorMessage(),
                 evaluation.getCreatedAt(),
-                evaluation.getCompletedAt()
-        );
+                evaluation.getCompletedAt());
+    }
+
+    private static List<SegmentData> parseSegments(String transcriptionJson) {
+        if (transcriptionJson == null || transcriptionJson.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        try {
+            List<TranscriptionService.Segment> segments = OBJECT_MAPPER.readValue(
+                    transcriptionJson,
+                    new TypeReference<>() {
+                    });
+
+            return segments.stream()
+                    .map(segment -> new SegmentData(
+                            segment.text(),
+                            segment.startSeconds(),
+                            segment.endSeconds()))
+                    .toList();
+        } catch (Exception ignored) {
+            return Collections.emptyList();
+        }
     }
 
     public record TranscriptionData(
             String fullText,
+            List<SegmentData> segments,
             Double durationSeconds,
-            String detectedLanguage
-    ) {}
+            String detectedLanguage) {
+    }
+
+    public record SegmentData(
+            String text,
+            double startSeconds,
+            double endSeconds) {
+    }
 
     public record MetricsData(
             Integer wordsPerMinute,
             Integer totalWords,
             Integer fillerWordCount,
             Integer pauseCount,
-            Double clarityScore
-    ) {}
+            Double clarityScore) {
+    }
 
     public record FeedbackData(
             String overallSummary,
-            String notesJson
-    ) {}
+            String notesJson) {
+    }
 }

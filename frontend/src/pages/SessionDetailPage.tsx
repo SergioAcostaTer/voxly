@@ -1,13 +1,16 @@
 import {
     AlertCircle,
     ArrowLeft,
+    Bot,
     CheckCircle,
     Clock,
     Gauge,
     Loader2,
     MessageSquare,
     Mic2,
+    PlayCircle,
     RefreshCw,
+    SkipForward,
     Timer,
     Video,
 } from 'lucide-react'
@@ -16,9 +19,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AUTH_BYPASS_ENABLED } from '../auth/testing-auth'
 import { useAuth } from '../auth/useAuth'
 import { AppHeader } from '../components/AppHeader'
+import { TypewriterText } from '../components/TypewriterText'
 import { api, ApiClientError } from '../lib/api'
 import { cn } from '../lib/cn'
-import type { Evaluation, FeedbackNote, FeedbackResponse } from '../types/evaluation'
+import type { Evaluation, FeedbackNote, FeedbackResponse, SegmentData } from '../types/evaluation'
 import type { Session } from '../types/sessions'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
@@ -29,7 +33,10 @@ const severityColors = {
   info: 'bg-blue-100 text-blue-700 border-blue-200',
   warning: 'bg-amber-100 text-amber-700 border-amber-200',
   suggestion: 'bg-green-100 text-green-700 border-green-200',
+  critical: 'bg-rose-100 text-rose-700 border-rose-200',
 }
+
+const GUIDED_TRIGGER_SEVERITIES = new Set(['warning', 'suggestion', 'critical'])
 
 type ProcessingState = {
   label: string
@@ -97,6 +104,8 @@ export function SessionDetailPage() {
   const navigate = useNavigate()
   const { accessToken, logout } = useAuth()
   const mediaRef = useRef<HTMLMediaElement>(null)
+  const transcriptContainerRef = useRef<HTMLDivElement>(null)
+  const previousTimeRef = useRef(0)
 
   const [session, setSession] = useState<Session | null>(null)
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null)
@@ -107,6 +116,12 @@ export function SessionDetailPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null)
   const [isLivePolling, setIsLivePolling] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [guidedModeEnabled, setGuidedModeEnabled] = useState(false)
+  const [activeCoachNote, setActiveCoachNote] = useState<FeedbackNote | null>(null)
+  const [dismissedNotes, setDismissedNotes] = useState<Set<number>>(new Set())
+  const [mediaDuration, setMediaDuration] = useState<number | null>(null)
   const streamAbortRef = useRef<AbortController | null>(null)
 
   const fetchData = useCallback(async () => {
@@ -234,8 +249,151 @@ export function SessionDetailPage() {
   function seekToTimestamp(seconds: number) {
     if (mediaRef.current) {
       mediaRef.current.currentTime = seconds
+      previousTimeRef.current = seconds
       void mediaRef.current.play()
     }
+  }
+
+  function normalizeSeverity(severity: string | null | undefined) {
+    return severity?.toLowerCase() ?? 'info'
+  }
+
+  const feedbackNotes = useMemo<FeedbackNote[]>(() => feedback?.notes ?? [], [feedback])
+  const transcriptSegments = useMemo<SegmentData[]>(
+    () => evaluation?.transcription?.segments ?? [],
+    [evaluation],
+  )
+
+  const guidedNotes = useMemo(() => {
+    return feedbackNotes
+      .filter((note): note is FeedbackNote & { timestampSeconds: number } => {
+        if (note.timestampSeconds == null) {
+          return false
+        }
+
+        return GUIDED_TRIGGER_SEVERITIES.has(normalizeSeverity(note.severity))
+      })
+      .sort((a, b) => a.timestampSeconds - b.timestampSeconds)
+  }, [feedbackNotes])
+
+  const playbackDuration = mediaDuration
+    ?? session?.mediaFile?.durationSeconds
+    ?? evaluation?.transcription?.durationSeconds
+    ?? null
+
+  const activeSegmentIndex = useMemo(() => {
+    if (!transcriptSegments.length) {
+      return -1
+    }
+
+    return transcriptSegments.findIndex((segment) => currentTime >= segment.startSeconds && currentTime <= segment.endSeconds)
+  }, [transcriptSegments, currentTime])
+
+  useEffect(() => {
+    if (!guidedModeEnabled || activeSegmentIndex < 0 || !transcriptContainerRef.current) {
+      return
+    }
+
+    const activeNode = transcriptContainerRef.current.querySelector<HTMLElement>(`[data-segment-index="${activeSegmentIndex}"]`)
+    if (!activeNode) {
+      return
+    }
+
+    activeNode.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [activeSegmentIndex, guidedModeEnabled])
+
+  function handleTimeUpdate() {
+    if (!mediaRef.current) return
+
+    const time = mediaRef.current.currentTime
+    setCurrentTime(time)
+
+    if (!guidedModeEnabled || activeCoachNote) {
+      previousTimeRef.current = time
+      return
+    }
+
+    const upcomingNote = guidedNotes.find((note) => {
+      const isTimeMatch = Math.abs(time - note.timestampSeconds) < 0.3
+      const isNotDismissed = !dismissedNotes.has(note.timestampSeconds)
+      return isTimeMatch && isNotDismissed
+    })
+
+    if (upcomingNote) {
+      mediaRef.current.pause()
+      setIsPlaying(false)
+      setActiveCoachNote(upcomingNote)
+      setDismissedNotes((prev) => {
+        const next = new Set(prev)
+        next.add(upcomingNote.timestampSeconds)
+        return next
+      })
+    }
+
+    previousTimeRef.current = time
+  }
+
+  function handleSeeked() {
+    if (!mediaRef.current) return
+    const time = mediaRef.current.currentTime
+    setCurrentTime(time)
+
+    if (time < previousTimeRef.current) {
+      setDismissedNotes(new Set())
+    }
+
+    previousTimeRef.current = time
+  }
+
+  function handlePlay() {
+    setIsPlaying(true)
+  }
+
+  function handlePause() {
+    setIsPlaying(false)
+  }
+
+  function startGuidedReview() {
+    if (!mediaRef.current) {
+      return
+    }
+
+    setGuidedModeEnabled(true)
+    setDismissedNotes(new Set())
+    setActiveCoachNote(null)
+    void mediaRef.current.play()
+  }
+
+  function continueGuidedReview() {
+    setActiveCoachNote(null)
+    void mediaRef.current?.play()
+  }
+
+  function replayRecentClip() {
+    if (!mediaRef.current) {
+      return
+    }
+
+    mediaRef.current.currentTime = Math.max(0, mediaRef.current.currentTime - 5)
+    previousTimeRef.current = mediaRef.current.currentTime
+    setActiveCoachNote(null)
+    void mediaRef.current.play()
+  }
+
+  function skipToNextGuidedMoment() {
+    if (!mediaRef.current) {
+      return
+    }
+
+    const nextMoment = guidedNotes.find((note) => note.timestampSeconds > currentTime)
+    if (!nextMoment) {
+      return
+    }
+
+    mediaRef.current.currentTime = Math.max(0, nextMoment.timestampSeconds - 0.2)
+    previousTimeRef.current = mediaRef.current.currentTime
+    setActiveCoachNote(null)
+    void mediaRef.current.play()
   }
 
   function formatTimestamp(seconds: number) {
@@ -254,7 +412,6 @@ export function SessionDetailPage() {
     })
   }
 
-  const feedbackNotes: FeedbackNote[] = feedback?.notes ?? []
   const categories = [...new Set(feedbackNotes.map((n) => n.category))]
   const filteredNotes = selectedCategory
     ? feedbackNotes.filter((n) => n.category === selectedCategory)
@@ -431,45 +588,187 @@ export function SessionDetailPage() {
 
         {/* Media Player */}
         {mediaUrl && (
-          <Card>
-            <h2 className="display-font mb-4 text-lg font-semibold text-foreground">
-              {isAudioMedia ? <Mic2 className="mr-2 inline-block" size={20} /> : <Video className="mr-2 inline-block" size={20} />}
-              {isAudioMedia ? 'Audio recording' : 'Recording'}
-            </h2>
-            {isAudioMedia ? (
-              <audio
-                ref={(node) => {
-                  mediaRef.current = node
-                }}
-                src={mediaUrl}
-                controls
-                className="w-full"
-                preload="metadata"
-              >
-                Your browser does not support audio playback.
-              </audio>
-            ) : (
-              <video
-                ref={(node) => {
-                  mediaRef.current = node
-                }}
-                src={mediaUrl}
-                controls
-                className="w-full rounded-xl bg-black"
-                preload="metadata"
-              >
-                Your browser does not support video playback.
-              </video>
-            )}
-            {session.mediaFile && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                {session.mediaFile.originalFileName}
-                {session.mediaFile.durationSeconds && (
-                  <> &middot; {formatTimestamp(session.mediaFile.durationSeconds)}</>
+          <div className={cn('grid gap-4', guidedModeEnabled && 'lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]')}>
+            <Card className={cn(guidedModeEnabled && 'ring-1 ring-primary/30')}>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="display-font text-lg font-semibold text-foreground">
+                  {isAudioMedia ? <Mic2 className="mr-2 inline-block" size={20} /> : <Video className="mr-2 inline-block" size={20} />}
+                  {isAudioMedia ? 'Audio recording' : 'Recording'}
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {!guidedModeEnabled ? (
+                    <Button onClick={startGuidedReview} disabled={guidedNotes.length === 0}>
+                      <PlayCircle size={18} />
+                      Start Guided Review
+                    </Button>
+                  ) : (
+                    <>
+                      <Button variant="secondary" onClick={skipToNextGuidedMoment} disabled={guidedNotes.length === 0}>
+                        <SkipForward size={18} />
+                        Skip to next moment
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          setGuidedModeEnabled(false)
+                          setActiveCoachNote(null)
+                        }}
+                      >
+                        Exit Guided Mode
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className={cn('relative rounded-xl', isAudioMedia ? 'bg-muted/30 p-4' : 'bg-black')}>
+                {isAudioMedia ? (
+                  <audio
+                    ref={(node) => {
+                      mediaRef.current = node
+                    }}
+                    src={mediaUrl}
+                    controls
+                    className="w-full"
+                    preload="metadata"
+                    onLoadedMetadata={() => setMediaDuration(mediaRef.current?.duration ?? null)}
+                    onTimeUpdate={handleTimeUpdate}
+                    onSeeked={handleSeeked}
+                    onPlay={handlePlay}
+                    onPause={handlePause}
+                  >
+                    Your browser does not support audio playback.
+                  </audio>
+                ) : (
+                  <video
+                    ref={(node) => {
+                      mediaRef.current = node
+                    }}
+                    src={mediaUrl}
+                    controls
+                    className="w-full rounded-xl bg-black"
+                    preload="metadata"
+                    onLoadedMetadata={() => setMediaDuration(mediaRef.current?.duration ?? null)}
+                    onTimeUpdate={handleTimeUpdate}
+                    onSeeked={handleSeeked}
+                    onPlay={handlePlay}
+                    onPause={handlePause}
+                  >
+                    Your browser does not support video playback.
+                  </video>
                 )}
-              </p>
+
+                {guidedModeEnabled && activeCoachNote && (
+                  <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-white/20 bg-slate-900/95 p-4 text-white shadow-2xl sm:inset-x-4 sm:bottom-4 sm:p-6">
+                    <div className="flex gap-3 sm:gap-4">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-cyan-200 sm:h-12 sm:w-12">
+                        <Bot size={20} />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs font-bold uppercase tracking-[0.14em] text-cyan-200 sm:text-sm">
+                          {activeCoachNote.title ?? 'Coach Insight'}
+                        </h4>
+                        <p className="mt-1 text-xs text-white/70 sm:text-sm">
+                          {activeCoachNote.category} · {activeCoachNote.severity}
+                        </p>
+
+                        <div className="mt-3 text-sm leading-relaxed text-white sm:text-base">
+                          <TypewriterText
+                            key={`${activeCoachNote.timestampSeconds ?? 'none'}-${activeCoachNote.coachScript ?? activeCoachNote.message}`}
+                            text={activeCoachNote.coachScript ?? activeCoachNote.message}
+                          />
+                        </div>
+
+                        <div className="mt-5 flex flex-wrap gap-2 sm:gap-3">
+                          <Button
+                            variant="secondary"
+                            className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                            onClick={replayRecentClip}
+                          >
+                            ⏪ Rewind 5s & Listen
+                          </Button>
+
+                          <Button onClick={continueGuidedReview}>
+                            Got it, continue ▶
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {guidedModeEnabled && playbackDuration && guidedNotes.length > 0 && (
+                <div className="mt-4">
+                  <div className="relative h-2 rounded-full bg-muted">
+                    {guidedNotes.map((note, index) => {
+                      const left = Math.min(100, Math.max(0, (note.timestampSeconds / playbackDuration) * 100))
+                      const isActive = activeCoachNote?.timestampSeconds === note.timestampSeconds
+                      return (
+                        <button
+                          key={`${note.timestampSeconds}-${index}`}
+                          onClick={() => seekToTimestamp(note.timestampSeconds)}
+                          className={cn(
+                            'absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white',
+                            isActive ? 'bg-primary shadow-glow' : 'bg-cyan-500/90',
+                          )}
+                          style={{ left: `${left}%` }}
+                          title={`Coaching moment at ${formatTimestamp(note.timestampSeconds)}`}
+                        />
+                      )
+                    })}
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {guidedNotes.length} coaching moments · {isPlaying ? 'Playing' : 'Paused'} · {formatTimestamp(currentTime)}
+                  </p>
+                </div>
+              )}
+
+              {session.mediaFile && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {session.mediaFile.originalFileName}
+                  {session.mediaFile.durationSeconds && (
+                    <> &middot; {formatTimestamp(session.mediaFile.durationSeconds)}</>
+                  )}
+                </p>
+              )}
+            </Card>
+
+            {guidedModeEnabled && (
+              <Card className="lg:max-h-[34rem] lg:overflow-hidden">
+                <h3 className="display-font mb-3 text-base font-semibold text-foreground">
+                  Karaoke Transcript
+                </h3>
+
+                {transcriptSegments.length > 0 ? (
+                  <div ref={transcriptContainerRef} className="h-80 overflow-y-auto rounded-xl bg-muted/25 p-4 text-sm leading-7 lg:h-full">
+                    {transcriptSegments.map((segment, index) => {
+                      const isActive = currentTime >= segment.startSeconds && currentTime <= segment.endSeconds
+                      return (
+                        <span
+                          key={index}
+                          data-segment-index={index}
+                          className={cn(
+                            'mr-1 inline rounded px-1 py-0.5 transition-colors duration-200',
+                            isActive
+                              ? 'bg-primary/15 font-semibold text-primary'
+                              : 'text-muted-foreground',
+                          )}
+                        >
+                          {segment.text}
+                        </span>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Timestamped transcript segments are not available for this session yet.
+                  </p>
+                )}
+              </Card>
             )}
-          </Card>
+          </div>
         )}
 
         {evaluation?.status !== 'completed' && session.mediaFile && (
@@ -607,7 +906,7 @@ export function SessionDetailPage() {
                   key={index}
                   className={cn(
                     'rounded-xl border p-4',
-                    severityColors[note.severity as keyof typeof severityColors] || 'bg-gray-100 text-gray-700 border-gray-200',
+                    severityColors[normalizeSeverity(note.severity) as keyof typeof severityColors] || 'bg-gray-100 text-gray-700 border-gray-200',
                   )}
                 >
                   <div className="flex items-start justify-between gap-4">

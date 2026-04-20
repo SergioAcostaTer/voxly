@@ -1,7 +1,14 @@
 export type EvaluationStatus = 'pending' | 'transcribing' | 'analyzing' | 'completed' | 'failed'
 
+export type SegmentData = {
+  text: string
+  startSeconds: number
+  endSeconds: number
+}
+
 export type TranscriptionData = {
   fullText: string
+  segments: SegmentData[]
   durationSeconds: number | null
   detectedLanguage: string | null
 }
@@ -35,6 +42,8 @@ export type Evaluation = {
 export type FeedbackNote = {
   category: string
   severity: string
+  title?: string | null
+  coachScript?: string | null
   message: string
   timestampSeconds: number | null
   endTimestampSeconds: number | null
