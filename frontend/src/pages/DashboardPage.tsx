@@ -60,14 +60,19 @@ export function DashboardPage() {
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link to="/sessions/new">
-              <Button className="bg-white text-primary hover:bg-white/90">
-                <Plus size={18} />
+              <Button
+                className="bg-white text-slate-900 ring-1 ring-white/70 shadow-[0_10px_30px_rgba(0,0,0,0.18)] hover:bg-white hover:shadow-[0_14px_36px_rgba(0,0,0,0.24)] focus-visible:ring-white/80"
+              >
+                <Plus size={18} aria-hidden="true" />
                 New Session
               </Button>
             </Link>
             <Link to="/sessions">
-              <Button variant="ghost" className="border border-white/30 text-white hover:bg-white/20">
-                <Video size={18} />
+              <Button
+                variant="ghost"
+                className="border border-white/40 text-white shadow-none hover:bg-white/15 hover:text-white focus-visible:ring-white/60"
+              >
+                <Video size={18} aria-hidden="true" />
                 View Sessions
               </Button>
             </Link>

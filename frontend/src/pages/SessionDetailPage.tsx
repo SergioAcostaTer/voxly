@@ -6,10 +6,15 @@ import {
     Clock,
     Gauge,
     Loader2,
+    Maximize2,
     MessageSquare,
     Mic2,
-    PlayCircle,
+    Minimize2,
+    Pause,
+    Play,
     RefreshCw,
+    Rewind,
+    FastForward,
     SkipForward,
     Timer,
     Video,
@@ -120,12 +125,17 @@ export function SessionDetailPage() {
   const [isLivePolling, setIsLivePolling] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [guidedModeEnabled, setGuidedModeEnabled] = useState(false)
+  // Guided review (karaoke transcript + synced coach notes) is always on.
+  const guidedModeEnabled = true
   const [activeCoachNote, setActiveCoachNote] = useState<FeedbackNote | null>(null)
   const [selectedFeedbackNote, setSelectedFeedbackNote] = useState<FeedbackNote | null>(null)
   const [dismissedNotes, setDismissedNotes] = useState<Set<number>>(new Set())
   const [mediaDuration, setMediaDuration] = useState<number | null>(null)
   const [isMediaReady, setIsMediaReady] = useState(false)
+  const [isGuidedFullscreen, setIsGuidedFullscreen] = useState(false)
+  const [splitPercent, setSplitPercent] = useState(66)
+  const splitContainerRef = useRef<HTMLDivElement>(null)
+  const isDraggingSplitRef = useRef(false)
   const streamAbortRef = useRef<AbortController | null>(null)
   const pendingSeekRef = useRef<number | null>(null)
 
@@ -317,17 +327,48 @@ export function SessionDetailPage() {
   }, [transcriptSegments, currentTime])
 
   useEffect(() => {
-    if (!guidedModeEnabled || activeSegmentIndex < 0 || !transcriptContainerRef.current) {
+    if (!isGuidedFullscreen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsGuidedFullscreen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [isGuidedFullscreen])
+
+  useEffect(() => {
+    if (!guidedModeEnabled && isGuidedFullscreen) {
+      setIsGuidedFullscreen(false)
+    }
+  }, [guidedModeEnabled, isGuidedFullscreen])
+
+  useEffect(() => {
+    const container = transcriptContainerRef.current
+    if (!guidedModeEnabled || activeSegmentIndex < 0 || !container) {
       return
     }
 
-    const activeNode = transcriptContainerRef.current.querySelector<HTMLElement>(`[data-segment-index="${activeSegmentIndex}"]`)
+    const activeNode = container.querySelector<HTMLElement>(`[data-segment-index="${activeSegmentIndex}"]`)
     if (!activeNode) {
       return
     }
 
-    activeNode.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [activeSegmentIndex, guidedModeEnabled])
+    // Scroll only the transcript container (not the page) so the active segment
+    // sits roughly in the middle of the viewport.
+    const containerRect = container.getBoundingClientRect()
+    const nodeRect = activeNode.getBoundingClientRect()
+    const nodeOffsetTop = nodeRect.top - containerRect.top + container.scrollTop
+    const targetScroll = nodeOffsetTop - container.clientHeight / 2 + nodeRect.height / 2
+
+    container.scrollTo({
+      top: Math.max(0, targetScroll),
+      behavior: 'smooth',
+    })
+  }, [activeSegmentIndex, guidedModeEnabled, isGuidedFullscreen])
 
   function handleTimeUpdate() {
     if (!mediaRef.current) return
@@ -409,7 +450,7 @@ export function SessionDetailPage() {
       return
     }
 
-    setGuidedModeEnabled(true)
+    setIsGuidedFullscreen(true)
     setDismissedNotes(new Set())
     setActiveCoachNote(null)
     void mediaRef.current.play()
@@ -503,7 +544,7 @@ export function SessionDetailPage() {
 
   return (
     <div className="px-4 pb-6 pt-28 sm:px-6 sm:pb-8 lg:px-8 lg:pb-12">
-      <div className="mx-auto w-full max-w-6xl space-y-6">
+      <div className="mx-auto w-full max-w-7xl space-y-4 sm:space-y-5 lg:space-y-6">
         <AppHeader
           rightSlot={
             <Link to="/sessions">
@@ -560,6 +601,8 @@ export function SessionDetailPage() {
                 variant="ghost"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
+                aria-label="Refresh session"
+                title="Refresh session"
                 className="text-primary-foreground hover:bg-white/20"
               >
                 <RefreshCw className={cn(isRefreshing && 'animate-spin')} size={18} />
@@ -597,29 +640,24 @@ export function SessionDetailPage() {
                   </p>
                 </div>
               </div>
-              <div className="grid gap-2 text-sm text-muted-foreground md:text-right">
-                <span>Your progress is saved automatically.</span>
-                <span>You can leave this page and come back anytime.</span>
-                <span>We'll keep this page updated for you.</span>
-              </div>
+              <p className="text-sm text-muted-foreground md:max-w-xs md:text-right">
+                Progress is saved automatically — you can leave and come back anytime.
+              </p>
             </div>
 
             {isProcessing && (
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl bg-white/70 p-4">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Step 1</p>
-                  <p className="mt-1 font-semibold text-foreground">Upload received</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Your recording is safely saved.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl bg-white/70 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Step 1</p>
+                  <p className="mt-1 text-sm font-semibold text-foreground">Upload received</p>
                 </div>
-                <div className="rounded-xl bg-white/70 p-4">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Step 2</p>
-                  <p className="mt-1 font-semibold text-foreground">Transcript in progress</p>
-                  <p className="mt-1 text-sm text-muted-foreground">We're turning your recording into text.</p>
+                <div className="rounded-xl bg-white/70 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Step 2</p>
+                  <p className="mt-1 text-sm font-semibold text-foreground">Transcribing</p>
                 </div>
-                <div className="rounded-xl bg-white/70 p-4">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Step 3</p>
-                  <p className="mt-1 font-semibold text-foreground">Feedback</p>
-                  <p className="mt-1 text-sm text-muted-foreground">You'll see your coaching notes here as soon as they're ready.</p>
+                <div className="rounded-xl bg-white/70 p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Step 3</p>
+                  <p className="mt-1 text-sm font-semibold text-foreground">Coaching feedback</p>
                 </div>
               </div>
             )}
@@ -643,83 +681,171 @@ export function SessionDetailPage() {
 
         {/* Media Player */}
         {mediaUrl && (
-          <div className={cn('grid gap-4', guidedModeEnabled && 'lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]')}>
-            <Card className={cn(guidedModeEnabled && 'ring-1 ring-primary/30')}>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div
+            ref={splitContainerRef}
+            style={
+              isGuidedFullscreen
+                ? {
+                    marginTop: 0,
+                    // On lg+ this CSS var drives the 3-column split (left | 1px divider | right).
+                    // Mobile falls back to the `grid-cols-1` class below.
+                    ['--split-cols' as string]: `minmax(0, ${splitPercent}fr) 1px minmax(0, ${100 - splitPercent}fr)`,
+                  }
+                : undefined
+            }
+            className={cn(
+              isGuidedFullscreen
+                ? 'fixed inset-0 z-50 overflow-hidden bg-[#fafaf7]'
+                : 'grid gap-4',
+              guidedModeEnabled && !isGuidedFullscreen && 'lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]',
+              isGuidedFullscreen && 'grid h-screen max-h-screen w-screen grid-cols-1 gap-0 lg:[grid-template-columns:var(--split-cols)]',
+            )}
+            role={isGuidedFullscreen ? 'dialog' : undefined}
+            aria-modal={isGuidedFullscreen || undefined}
+            aria-label={isGuidedFullscreen ? 'Guided review fullscreen' : undefined}
+          >
+            <Card
+              className={cn(
+                guidedModeEnabled && 'ring-1 ring-primary/30',
+                isGuidedFullscreen && 'flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 p-3 sm:p-4',
+              )}
+            >
+              <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
                 <h2 className="display-font text-lg font-semibold text-foreground">
                   {isAudioMedia ? <Mic2 className="mr-2 inline-block" size={20} /> : <Video className="mr-2 inline-block" size={20} />}
                   {isAudioMedia ? 'Audio recording' : 'Recording'}
                 </h2>
                 <div className="flex flex-wrap gap-2">
-                  {!guidedModeEnabled ? (
-                    <Button onClick={startGuidedReview} disabled={guidedNotes.length === 0}>
-                      <PlayCircle size={18} />
-                      Start Guided Review
-                    </Button>
-                  ) : (
-                    <>
-                      <Button variant="secondary" onClick={skipToNextGuidedMoment} disabled={guidedNotes.length === 0}>
-                        <SkipForward size={18} />
-                        Skip to next moment
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          setGuidedModeEnabled(false)
-                          setActiveCoachNote(null)
-                        }}
-                      >
-                        Exit Guided Mode
-                      </Button>
-                    </>
-                  )}
+                  <Button
+                    variant="secondary"
+                    onClick={skipToNextGuidedMoment}
+                    disabled={guidedNotes.length === 0}
+                  >
+                    <SkipForward size={18} />
+                    Next moment
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (!isGuidedFullscreen) {
+                        startGuidedReview()
+                      } else {
+                        setIsGuidedFullscreen(false)
+                      }
+                    }}
+                    aria-label={isGuidedFullscreen ? 'Exit focus mode (Esc)' : 'Open focus mode'}
+                    title={isGuidedFullscreen ? 'Exit focus mode (Esc)' : 'Open focus mode'}
+                  >
+                    {isGuidedFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                    {isGuidedFullscreen ? 'Exit focus' : 'Focus mode'}
+                  </Button>
                 </div>
               </div>
 
-              <div className={cn('relative rounded-xl', isAudioMedia ? 'bg-muted/30 p-4' : 'bg-black')}>
+              <div
+                className={cn(
+                  'overflow-hidden rounded-xl border border-slate-900/10 bg-slate-950 shadow-sm',
+                  isGuidedFullscreen && 'mx-auto flex w-full max-w-4xl shrink-0 flex-col',
+                )}
+              >
                 {isAudioMedia ? (
-                  <audio
-                    ref={(node) => {
-                      mediaRef.current = node
-                    }}
-                    src={mediaUrl}
-                    className="hidden"
-                    preload="metadata"
-                    onLoadedMetadata={handleMediaReady}
-                    onCanPlay={handleMediaReady}
-                    onDurationChange={handleMediaReady}
-                    onTimeUpdate={handleTimeUpdate}
-                    onSeeking={handleSeeking}
-                    onSeeked={handleSeeked}
-                    onPlay={handlePlay}
-                    onPause={handlePause}
-                  >
-                    Your browser does not support audio playback.
-                  </audio>
+                  <>
+                    <audio
+                      ref={(node) => {
+                        mediaRef.current = node
+                      }}
+                      src={mediaUrl}
+                      className="hidden"
+                      preload="metadata"
+                      onLoadedMetadata={handleMediaReady}
+                      onCanPlay={handleMediaReady}
+                      onDurationChange={handleMediaReady}
+                      onTimeUpdate={handleTimeUpdate}
+                      onSeeking={handleSeeking}
+                      onSeeked={handleSeeked}
+                      onPlay={handlePlay}
+                      onPause={handlePause}
+                    >
+                      Your browser does not support audio playback.
+                    </audio>
+                    <div className="flex h-48 items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 sm:h-56">
+                      <div className="flex flex-col items-center gap-3 text-slate-200">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20">
+                          <Mic2 size={28} aria-hidden="true" />
+                        </div>
+                        <p className="text-sm font-medium">Audio recording</p>
+                      </div>
+                    </div>
+                  </>
                 ) : (
-                  <video
-                    ref={(node) => {
-                      mediaRef.current = node
-                    }}
-                    src={mediaUrl}
-                    className="w-full rounded-xl bg-black"
-                    preload="metadata"
-                    onLoadedMetadata={handleMediaReady}
-                    onCanPlay={handleMediaReady}
-                    onDurationChange={handleMediaReady}
-                    onTimeUpdate={handleTimeUpdate}
-                    onSeeking={handleSeeking}
-                    onSeeked={handleSeeked}
-                    onPlay={handlePlay}
-                    onPause={handlePause}
+                  <div
+                    className={cn(
+                      'flex w-full items-center justify-center bg-black',
+                      isGuidedFullscreen
+                        ? 'shrink-0 max-h-[42vh] lg:max-h-[45vh]'
+                        : guidedModeEnabled
+                          ? 'max-h-[55vh] lg:max-h-[50vh]'
+                          : 'max-h-[65vh] lg:max-h-[60vh]',
+                    )}
                   >
-                    Your browser does not support video playback.
-                  </video>
+                    <video
+                      ref={(node) => {
+                        mediaRef.current = node
+                      }}
+                      src={mediaUrl}
+                      className="h-auto max-h-full w-auto max-w-full object-contain"
+                      preload="metadata"
+                      playsInline
+                      onLoadedMetadata={handleMediaReady}
+                      onCanPlay={handleMediaReady}
+                      onDurationChange={handleMediaReady}
+                      onTimeUpdate={handleTimeUpdate}
+                      onSeeking={handleSeeking}
+                      onSeeked={handleSeeked}
+                      onPlay={handlePlay}
+                      onPause={handlePause}
+                    >
+                      Your browser does not support video playback.
+                    </video>
+                  </div>
                 )}
 
-                <div className={cn('mt-3 rounded-2xl border border-border bg-background/90 p-4 shadow-sm', isAudioMedia && 'block')}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
+                <div className="shrink-0 bg-slate-900/95 px-3 py-3 sm:px-4">
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(0, currentDuration ?? 0)}
+                    step={0.01}
+                    value={Math.min(currentTime, currentDuration ?? currentTime)}
+                    aria-label="Seek playback"
+                    aria-valuemin={0}
+                    aria-valuemax={Math.max(0, currentDuration ?? 0)}
+                    aria-valuenow={Math.min(currentTime, currentDuration ?? currentTime)}
+                    aria-valuetext={formatTimestamp(currentTime)}
+                    onMouseDown={handleSeeking}
+                    onTouchStart={handleSeeking}
+                    onChange={(event) => {
+                      const nextTime = Number(event.target.value)
+                      if (!Number.isNaN(nextTime)) {
+                        seekToTimestamp(nextTime)
+                      }
+                    }}
+                    style={{
+                      background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
+                        currentDuration && currentDuration > 0
+                          ? Math.min(100, (currentTime / currentDuration) * 100)
+                          : 0
+                      }%, rgba(255,255,255,0.18) ${
+                        currentDuration && currentDuration > 0
+                          ? Math.min(100, (currentTime / currentDuration) * 100)
+                          : 0
+                      }%, rgba(255,255,255,0.18) 100%)`,
+                    }}
+                    className="h-1.5 w-full cursor-pointer appearance-none rounded-full accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                  />
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      type="button"
                       onClick={() => {
                         if (!mediaRef.current) return
                         if (isPlaying) {
@@ -729,36 +855,41 @@ export function SessionDetailPage() {
                         }
                       }}
                       disabled={!mediaRef.current}
+                      aria-label={isPlaying ? 'Pause' : 'Play'}
+                      title={isPlaying ? 'Pause' : 'Play'}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-900 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:pointer-events-none disabled:opacity-40"
                     >
-                      {isPlaying ? 'Pause' : 'Play'}
-                    </Button>
-                    <Button variant="secondary" onClick={() => seekToTimestamp(Math.max(0, currentTime - 5))} disabled={!mediaRef.current}>
-                      Rewind 5s
-                    </Button>
-                    <Button variant="secondary" onClick={() => seekToTimestamp(Math.min(currentDuration ?? currentTime + 5, currentTime + 5))} disabled={!mediaRef.current}>
-                      Forward 5s
-                    </Button>
-                    <div className="ml-auto text-xs text-muted-foreground">
-                      {formatTimestamp(currentTime)} / {currentDuration != null ? formatTimestamp(currentDuration) : '--:--'}
+                      {isPlaying ? <Pause size={18} /> : <Play size={18} className="translate-x-0.5" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => seekToTimestamp(Math.max(0, currentTime - 5))}
+                      disabled={!mediaRef.current}
+                      aria-label="Rewind 5 seconds"
+                      title="Rewind 5 seconds"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      <Rewind size={18} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => seekToTimestamp(Math.min(currentDuration ?? currentTime + 5, currentTime + 5))}
+                      disabled={!mediaRef.current}
+                      aria-label="Forward 5 seconds"
+                      title="Forward 5 seconds"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      <FastForward size={18} />
+                    </button>
+
+                    <div className="ml-auto font-mono text-xs tabular-nums text-slate-300">
+                      {formatTimestamp(currentTime)}
+                      <span className="mx-1 text-slate-500">/</span>
+                      {currentDuration != null ? formatTimestamp(currentDuration) : '--:--'}
                     </div>
                   </div>
-
-                  <input
-                    type="range"
-                    min={0}
-                    max={Math.max(0, currentDuration ?? 0)}
-                    step={0.01}
-                    value={Math.min(currentTime, currentDuration ?? currentTime)}
-                    onMouseDown={handleSeeking}
-                    onTouchStart={handleSeeking}
-                    onChange={(event) => {
-                      const nextTime = Number(event.target.value)
-                      if (!Number.isNaN(nextTime)) {
-                        seekToTimestamp(nextTime)
-                      }
-                    }}
-                    className="mt-4 h-2 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
-                  />
                 </div>
 
               </div>
@@ -766,7 +897,13 @@ export function SessionDetailPage() {
               <div
                 className={cn(
                   'mt-3 overflow-hidden rounded-2xl border border-border bg-background/90 shadow-sm transition-all duration-300 ease-out',
-                  visibleCoachNote ? 'max-h-96 opacity-100 translate-y-0' : 'pointer-events-none max-h-0 opacity-0 -translate-y-2',
+                  isGuidedFullscreen
+                    ? visibleCoachNote
+                      ? 'min-h-0 flex-1 opacity-100 translate-y-0 overflow-y-auto'
+                      : 'pointer-events-none h-0 opacity-0 -translate-y-2'
+                    : visibleCoachNote
+                      ? 'shrink-0 max-h-96 opacity-100 translate-y-0'
+                      : 'pointer-events-none shrink-0 max-h-0 opacity-0 -translate-y-2',
                 )}
               >
                 {visibleCoachNote && (
@@ -833,7 +970,7 @@ export function SessionDetailPage() {
               </div>
 
               {guidedModeEnabled && playbackDuration && guidedNotes.length > 0 && (
-                <div className="mt-4">
+                <div className="mt-4 shrink-0">
                   <div className="relative h-2 rounded-full bg-muted">
                     {guidedNotes.map((note, index) => {
                       const left = Math.min(100, Math.max(0, (note.timestampSeconds / playbackDuration) * 100))
@@ -841,12 +978,14 @@ export function SessionDetailPage() {
                       return (
                         <button
                           key={`${note.timestampSeconds}-${index}`}
+                          type="button"
                           onClick={() => openFeedbackNote(note)}
                           className={cn(
-                            'absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white',
+                            'absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
                             isActive ? 'bg-primary shadow-glow' : 'bg-cyan-500/90',
                           )}
                           style={{ left: `${left}%` }}
+                          aria-label={`Coaching moment at ${formatTimestamp(note.timestampSeconds)}`}
                           title={`Coaching moment at ${formatTimestamp(note.timestampSeconds)}`}
                         />
                       )
@@ -868,14 +1007,58 @@ export function SessionDetailPage() {
               )}
             </Card>
 
+            {guidedModeEnabled && isGuidedFullscreen && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize panels"
+                tabIndex={0}
+                onPointerDown={(e) => {
+                  isDraggingSplitRef.current = true
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                }}
+                onPointerMove={(e) => {
+                  if (!isDraggingSplitRef.current || !splitContainerRef.current) return
+                  const rect = splitContainerRef.current.getBoundingClientRect()
+                  const pct = ((e.clientX - rect.left) / rect.width) * 100
+                  setSplitPercent(Math.max(25, Math.min(85, pct)))
+                }}
+                onPointerUp={(e) => {
+                  isDraggingSplitRef.current = false
+                  e.currentTarget.releasePointerCapture(e.pointerId)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowLeft') setSplitPercent((v) => Math.max(25, v - 2))
+                  if (e.key === 'ArrowRight') setSplitPercent((v) => Math.min(85, v + 2))
+                }}
+                className="group relative hidden cursor-col-resize items-stretch justify-center bg-slate-200 transition-colors hover:bg-primary/40 lg:flex"
+              >
+                {/* Invisible expanded hit zone — 32px wide, receives drag events via bubbling */}
+                <span className="absolute inset-y-0 -left-4 -right-4 cursor-col-resize" aria-hidden="true" />
+                <span className="pointer-events-none my-auto h-14 w-1 rounded-full bg-slate-400 transition-colors group-hover:bg-primary" aria-hidden="true" />
+              </div>
+            )}
             {guidedModeEnabled && (
-              <Card className="lg:max-h-[34rem] lg:overflow-hidden">
-                <h3 className="display-font mb-3 text-base font-semibold text-foreground">
+              <Card
+                className={cn(
+                  'flex min-h-0 flex-col',
+                  isGuidedFullscreen ? 'h-full rounded-none border-0 p-3 sm:p-4' : 'lg:h-full lg:max-h-[60vh]',
+                )}
+              >
+                <h3 className="display-font mb-3 shrink-0 text-base font-semibold text-foreground">
                   Karaoke Transcript
                 </h3>
 
                 {transcriptSegments.length > 0 ? (
-                  <div ref={transcriptContainerRef} className="h-80 overflow-y-auto rounded-xl bg-muted/25 p-4 text-sm leading-7 lg:h-full">
+                  <div
+                    ref={transcriptContainerRef}
+                    className={cn(
+                      'min-h-0 flex-1 overflow-y-auto rounded-xl bg-muted/25 p-4 leading-7',
+                      isGuidedFullscreen
+                        ? 'text-base lg:text-lg leading-8 lg:leading-9'
+                        : 'h-80 text-sm lg:h-auto',
+                    )}
+                  >
                     {transcriptSegments.map((segment, index) => {
                       const isActive = currentTime >= segment.startSeconds && currentTime <= segment.endSeconds
                       return (
