@@ -68,6 +68,7 @@ openai:
     model: ${OPENAI_GPT_MODEL:gpt-4o-mini}
     maxTokens: ${OPENAI_GPT_MAX_TOKENS:1500}
     temperature: ${OPENAI_GPT_TEMPERATURE:0.7}
+    maxPromptChars: ${OPENAI_GPT_MAX_PROMPT_CHARS:120000}
 
 storage:
   temp-dir: ${STORAGE_TEMP_DIR:/tmp/voxly-temp}

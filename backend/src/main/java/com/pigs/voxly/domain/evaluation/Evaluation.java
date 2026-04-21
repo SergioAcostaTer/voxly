@@ -198,6 +198,25 @@ public final class Evaluation extends AggregateRoot<EvaluationId> {
         return processingStartedAt == null || processingStartedAt.isBefore(cutoff);
     }
 
+    public boolean canRetry(Instant cutoff) {
+        if (status != EvaluationStatus.FAILED) {
+            return false;
+        }
+        return completedAt == null || completedAt.isBefore(cutoff);
+    }
+
+    public Result retry() {
+        if (status == EvaluationStatus.COMPLETED) {
+            return Result.failure(EvaluationErrors.ALREADY_COMPLETED);
+        }
+        boolean hasTranscription = transcriptionText != null && !transcriptionText.isBlank();
+        this.status = hasTranscription ? EvaluationStatus.ANALYZING : EvaluationStatus.PENDING;
+        this.errorMessage = null;
+        this.completedAt = null;
+        this.processingStartedAt = hasTranscription ? Instant.now() : null;
+        return Result.success();
+    }
+
     private String truncate(String value, int maxLength) {
         if (value == null || value.length() <= maxLength) {
             return value;

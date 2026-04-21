@@ -9,14 +9,14 @@
   --bg-soft: 28 60% 98%;
   --foreground: 208 27% 17%;
   --muted-foreground: 208 15% 36%;
-  --primary: 184 88% 29%;
+  --primary: 184 88% 22%;
   --primary-foreground: 0 0% 100%;
   --accent: 24 95% 58%;
   --accent-foreground: 0 0% 100%;
   --card: 0 0% 100%;
   --card-foreground: 208 27% 17%;
   --border: 196 28% 82%;
-  --ring: 184 88% 35%;
+  --ring: 184 88% 30%;
 }
 
 * {

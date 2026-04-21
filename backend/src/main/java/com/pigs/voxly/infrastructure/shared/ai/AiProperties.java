@@ -15,6 +15,7 @@ public record AiProperties(
     ) {}
 
     public record OpenAiGptProperties(
-            @DefaultValue("gpt-4o-mini") String model
+            @DefaultValue("gpt-4o-mini") String model,
+            @DefaultValue("120000") int maxPromptChars
     ) {}
 }

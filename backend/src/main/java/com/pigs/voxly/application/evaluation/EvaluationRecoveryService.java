@@ -42,7 +42,11 @@ public class EvaluationRecoveryService {
     }
 
     private void recoverPendingEvaluations(String trigger) {
-        var statuses = List.of(EvaluationStatus.PENDING, EvaluationStatus.TRANSCRIBING, EvaluationStatus.ANALYZING);
+        var statuses = List.of(
+                EvaluationStatus.PENDING,
+                EvaluationStatus.TRANSCRIBING,
+                EvaluationStatus.ANALYZING,
+                EvaluationStatus.FAILED);
         var candidates = evaluationRepository.findByStatuses(statuses);
         var staleCutoff = Instant.now().minus(staleThreshold);
 
@@ -50,12 +54,27 @@ public class EvaluationRecoveryService {
             return;
         }
 
-        log.info("Evaluation recovery ({}) found {} in-progress evaluations", trigger, candidates.size());
+        log.info("Evaluation recovery ({}) found {} unfinished evaluations", trigger, candidates.size());
 
         for (var evaluation : candidates) {
-            if (evaluation.isCompleted() || evaluation.isFailed()) {
+            if (evaluation.isCompleted()) {
                 continue;
             }
+
+            if (evaluation.isFailed()) {
+                if (!evaluation.canRetry(staleCutoff)) {
+                    continue;
+                }
+                var retryResult = evaluation.retry();
+                if (retryResult.isFailure()) {
+                    continue;
+                }
+                evaluationRepository.save(evaluation);
+                log.info("Retrying failed evaluation {}", evaluation.getId().getValue());
+                evaluationProcessor.processAsync(evaluation.getId().getValue());
+                continue;
+            }
+
             if (!evaluation.isProcessingStale(staleCutoff)) {
                 continue;
             }

@@ -137,7 +137,15 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
             TranscriptionService.TranscriptionResult transcription,
             String sessionType,
             Metrics metrics) {
-        String transcriptPayload = buildTranscriptPayload(transcription);
+        int budget = Math.max(2000, aiProperties.gpt().maxPromptChars());
+        // Reserve ~3k chars for the static scaffolding (instructions, metrics, JSON schema)
+        // and split the remainder between the narrative transcript and the timing payload.
+        int transcriptBudget = Math.max(1000, (budget - 3000) / 3);
+        int timingBudget = Math.max(1000, (budget - 3000) - transcriptBudget);
+
+        String fullText = truncateText(transcription.fullText(), transcriptBudget);
+        String transcriptPayload = buildTranscriptPayload(transcription, timingBudget);
+
         StringBuilder prompt = new StringBuilder();
         prompt.append("Analyze this ").append(sessionType).append(" transcription and provide feedback.\n\n");
         prompt.append("**Metrics:**\n");
@@ -147,7 +155,7 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
         prompt.append("- Pauses: ").append(metrics.pauseCount()).append('\n');
         prompt.append("- Duration: ").append(String.format(Locale.ROOT, "%.1f", metrics.durationMinutes())).append(" minutes\n\n");
         prompt.append("**Transcription:**\n");
-        prompt.append(transcription.fullText()).append("\n\n");
+        prompt.append(fullText).append("\n\n");
         prompt.append("**Output requirements:**\n");
         prompt.append("- You are writing for Guided Coach Mode. Each note should read like a conversational coaching intervention.\n");
         prompt.append("- Keep tone friendly, first-person, and professional.\n");
@@ -313,18 +321,75 @@ public class OpenAiSpeechAnalysisService implements SpeechAnalysisService {
         return notes.stream().anyMatch(note -> normalizeCategory(note.category()).equals(category));
     }
 
-    private String buildTranscriptPayload(TranscriptionService.TranscriptionResult transcription) {
+    private String buildTranscriptPayload(
+            TranscriptionService.TranscriptionResult transcription,
+            int budgetChars) {
+        List<TranscriptionService.Segment> segments = transcription.segments() == null
+                ? List.of()
+                : transcription.segments();
+        List<TranscriptionService.Word> words = transcription.words() == null
+                ? List.of()
+                : transcription.words();
+
+        // Attempt 1: full payload with words and segments.
+        String payload = serializePayload(transcription, segments, words);
+        if (payload.length() <= budgetChars) {
+            return payload;
+        }
+
+        // Attempt 2: drop word-level timings (by far the heaviest field).
+        log.info("Dropping word-level timings to fit analysis prompt budget ({} chars)", budgetChars);
+        payload = serializePayload(transcription, segments, List.of());
+        if (payload.length() <= budgetChars) {
+            return payload;
+        }
+
+        // Attempt 3: downsample segments progressively (keep every Nth) until it fits.
+        int stride = 2;
+        while (!segments.isEmpty() && stride <= 32) {
+            List<TranscriptionService.Segment> reduced = new ArrayList<>();
+            for (int i = 0; i < segments.size(); i += stride) {
+                reduced.add(segments.get(i));
+            }
+            payload = serializePayload(transcription, reduced, List.of());
+            if (payload.length() <= budgetChars) {
+                log.info("Downsampled segments (stride={}) to fit analysis prompt budget", stride);
+                return payload;
+            }
+            stride *= 2;
+        }
+
+        // Attempt 4: fall back to a text-only payload with truncated full text.
+        log.warn("Transcript timing payload exceeds budget even after downsampling; falling back to plain text");
+        return truncateText(transcription.fullText(), budgetChars);
+    }
+
+    private String serializePayload(
+            TranscriptionService.TranscriptionResult transcription,
+            List<TranscriptionService.Segment> segments,
+            List<TranscriptionService.Word> words) {
         try {
             var payload = new TranscriptPayload(
                     transcription.fullText(),
                     transcription.durationSeconds(),
                     transcription.detectedLanguage(),
-                    transcription.segments(),
-                    transcription.words());
+                    segments,
+                    words);
             return objectMapper.writeValueAsString(payload);
         } catch (JsonProcessingException e) {
-            return transcription.fullText();
+            return transcription.fullText() == null ? "" : transcription.fullText();
         }
+    }
+
+    private String truncateText(String text, int maxChars) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        if (text.length() <= maxChars) {
+            return text;
+        }
+        int keep = Math.max(0, maxChars - 40);
+        return text.substring(0, keep) + "\n...[truncated for length]...";
     }
 
     private double estimateTimestampSeconds(TranscriptionService.Segment segment, int startIndex, int endIndex) {

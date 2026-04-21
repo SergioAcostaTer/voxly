@@ -24,6 +24,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -60,20 +61,44 @@ public class R2StorageService implements StorageService {
         this.presignedUrlDuration = Duration.ofSeconds(Math.max(1, presignedUrlExpirationSeconds));
         this.tempDir = Path.of(tempDirPath).toAbsolutePath().normalize();
 
-        // Initialize S3 client with R2 endpoint
+        if (endpoint == null || endpoint.isBlank()) {
+            throw new IllegalStateException(
+                    "Storage endpoint is not configured. Set CLOUDFLARE_R2_ENDPOINT (e.g. http://localhost:19100 for local MinIO).");
+        }
+
+        URI endpointUri;
+        try {
+            endpointUri = new URI(endpoint);
+            if (endpointUri.getScheme() == null || endpointUri.getHost() == null) {
+                throw new IllegalArgumentException("missing scheme or host");
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Invalid storage endpoint URI: '" + endpoint
+                            + "'. Expected format: http(s)://host:port (e.g. http://localhost:19100).",
+                    e);
+        }
+
+        // S3-compatible client (Cloudflare R2 or MinIO). Path-style access is
+        // required by MinIO and also supported by R2.
         AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKeyId, accessKeySecret);
         Region awsRegion = Region.of(region);
+        S3Configuration serviceConfig = S3Configuration.builder()
+                .pathStyleAccessEnabled(true)
+                .build();
 
         this.s3Client = S3Client.builder()
-                .endpointOverride(URI.create(endpoint))
+                .endpointOverride(endpointUri)
                 .credentialsProvider(StaticCredentialsProvider.create(credentials))
                 .region(awsRegion)
+                .serviceConfiguration(serviceConfig)
                 .build();
 
         this.s3Presigner = S3Presigner.builder()
-                .endpointOverride(URI.create(endpoint))
+                .endpointOverride(endpointUri)
                 .credentialsProvider(StaticCredentialsProvider.create(credentials))
                 .region(awsRegion)
+                .serviceConfiguration(serviceConfig)
                 .build();
 
         try {
