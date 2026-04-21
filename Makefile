@@ -14,7 +14,8 @@ endif
 	backend backend-testing frontend up up-testing infra-up infra-down infra-logs \
 	backend-test frontend-test test \
 	backend-build frontend-build build \
-	lint
+	lint \
+	audit audit-preview audit-ci
 
 help:
 	@echo "Voxly Makefile"
@@ -34,6 +35,9 @@ help:
 	@echo "  make frontend-test    - Run frontend lint + build"
 	@echo "  make test             - Run backend-test + frontend-test"
 	@echo "  make lint             - Run frontend lint"
+	@echo "  make audit            - Run Unlighthouse audit against the dev server (http://localhost:5173)"
+	@echo "  make audit-preview    - Run Unlighthouse audit against 'vite preview' (http://localhost:4173)"
+	@echo "  make audit-ci         - Run Unlighthouse CI with a minimum score budget"
 	@echo ""
 	@echo "Build:"
 	@echo "  make backend-build    - Build backend"
@@ -80,6 +84,15 @@ test: backend-test frontend-test
 
 lint:
 	cd $(FRONTEND_DIR) && $(NPM) run lint
+
+audit:
+	cd $(FRONTEND_DIR) && $(NPM) run audit
+
+audit-preview:
+	cd $(FRONTEND_DIR) && $(NPM) run audit:preview
+
+audit-ci:
+	cd $(FRONTEND_DIR) && $(NPM) run audit:ci
 
 backend-build:
 	cd $(BACKEND_DIR) && $(GRADLEW) clean build -x test

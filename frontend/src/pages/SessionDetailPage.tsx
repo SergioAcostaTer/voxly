@@ -132,6 +132,7 @@ export function SessionDetailPage() {
   const [dismissedNotes, setDismissedNotes] = useState<Set<number>>(new Set())
   const [mediaDuration, setMediaDuration] = useState<number | null>(null)
   const [isMediaReady, setIsMediaReady] = useState(false)
+  const [isScrubbing, setIsScrubbing] = useState(false)
   const [isGuidedFullscreen, setIsGuidedFullscreen] = useState(false)
   const [splitPercent, setSplitPercent] = useState(66)
   const splitContainerRef = useRef<HTMLDivElement>(null)
@@ -374,7 +375,13 @@ export function SessionDetailPage() {
     if (!mediaRef.current) return
 
     const time = mediaRef.current.currentTime
-    setCurrentTime(time)
+
+    // While the user is actively dragging the seek slider, the slider's local
+    // value drives currentTime. Ignore transient timeupdate events so the thumb
+    // doesn't snap back to wherever the underlying video currently reports.
+    if (!isScrubbing) {
+      setCurrentTime(time)
+    }
 
     if (!guidedModeEnabled || activeCoachNote || isSeekingRef.current || !isPlaying) {
       previousTimeRef.current = time
@@ -406,7 +413,9 @@ export function SessionDetailPage() {
     if (!mediaRef.current) return
     isSeekingRef.current = false
     const time = mediaRef.current.currentTime
-    setCurrentTime(time)
+    if (!isScrubbing) {
+      setCurrentTime(time)
+    }
 
     if (time < previousTimeRef.current) {
       setDismissedNotes(new Set())
@@ -821,8 +830,20 @@ export function SessionDetailPage() {
                     aria-valuemax={Math.max(0, currentDuration ?? 0)}
                     aria-valuenow={Math.min(currentTime, currentDuration ?? currentTime)}
                     aria-valuetext={formatTimestamp(currentTime)}
-                    onMouseDown={handleSeeking}
-                    onTouchStart={handleSeeking}
+                    onPointerDown={(event) => {
+                      setIsScrubbing(true)
+                      handleSeeking()
+                      event.currentTarget.setPointerCapture(event.pointerId)
+                    }}
+                    onPointerUp={(event) => {
+                      setIsScrubbing(false)
+                      try {
+                        event.currentTarget.releasePointerCapture(event.pointerId)
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    onPointerCancel={() => setIsScrubbing(false)}
                     onChange={(event) => {
                       const nextTime = Number(event.target.value)
                       if (!Number.isNaN(nextTime)) {

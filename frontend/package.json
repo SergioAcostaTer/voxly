@@ -9,7 +9,10 @@
         "dev:all:testing": "concurrently --kill-others-on-fail --names backend,frontend --prefix-colors blue,green \"call ..\\backend\\gradlew.bat -p ..\\backend bootRun --args=--spring.profiles.active=testing\" \"cmd /c set VITE_AUTH_BYPASS=true&& vite\"",
         "build": "tsc -b && vite build",
         "lint": "eslint .",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "audit": "npx --yes unlighthouse --site http://localhost:5173",
+        "audit:preview": "npx --yes unlighthouse --site http://localhost:4173",
+        "audit:ci": "npx --yes unlighthouse-ci --site http://localhost:5173 --budget 80"
     },
     "dependencies": {
         "clsx": "^2.1.1",
