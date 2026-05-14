@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: voxly-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: voxly
+      POSTGRES_USER: voxly_user
+      POSTGRES_PASSWORD: voxly_password
+    ports:
+      - "55432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voxly_user -d voxly"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: voxly-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: voxlyminio
+      MINIO_ROOT_PASSWORD: voxlyminiosecret
+    ports:
+      - "19100:9000"
+      - "19101:9001"
+    volumes:
+      - minio_data:/data
+
+  minio-setup:
+    image: minio/mc:latest
+    container_name: voxly-minio-setup
+    depends_on:
+      - minio
+    restart: "no"
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 voxlyminio voxlyminiosecret; do sleep 2; done &&
+      mc mb --ignore-existing local/voxly-sessions &&
+      mc anonymous set private local/voxly-sessions
+      "
+
+  ai-analyzer:
+    build:
+      context: ../ai
+      dockerfile: Dockerfile
+    container_name: voxly-ai-analyzer
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:v1.26
+    container_name: voxly-mailpit
+    restart: unless-stopped
+    ports:
+      - "11025:1025"
+      - "18025:8025"
+
+volumes:
+  postgres_data:
+  minio_data:

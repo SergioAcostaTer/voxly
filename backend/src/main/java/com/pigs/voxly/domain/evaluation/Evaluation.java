@@ -1,0 +1,396 @@
+package com.pigs.voxly.domain.evaluation;
+
+import com.pigs.voxly.domain.evaluation.enumerations.EvaluationStatus;
+import com.pigs.voxly.domain.identity.UserId;
+import com.pigs.voxly.domain.sessions.SessionId;
+import com.pigs.voxly.sharedKernel.domain.ddd.AggregateRoot;
+import com.pigs.voxly.sharedKernel.domain.results.Result;
+import com.pigs.voxly.sharedKernel.domain.results.ResultT;
+
+import java.time.Instant;
+
+public final class Evaluation extends AggregateRoot<EvaluationId> {
+    private static final int MAX_ERROR_MESSAGE_LENGTH = 255;
+
+    private SessionId sessionId;
+    private UserId userId;
+    private EvaluationStatus status;
+    private String sessionType;
+
+    // Transcription data
+    private String transcriptionText;
+    private String transcriptionJson; // Full segments JSON
+    private String transcriptionWordsJson; // Full word-level timestamps JSON
+    private String transcriptionRawJson; // Raw transcription payload JSON
+    private Double durationSeconds;
+    private String detectedLanguage;
+
+    // Metrics
+    private Integer wordsPerMinute;
+    private Integer totalWords;
+    private Integer fillerWordCount;
+    private Integer pauseCount;
+    private Double clarityScore;
+    private String metricsJson; // Full metrics JSON
+
+    // Feedback
+    private String feedbackJson; // Full feedback notes JSON
+    private String overallSummary;
+    private String strengthsJson;
+    private String improvementsJson;
+
+    // Posture analysis
+    private Double postureScore;
+    private String postureGrade;
+    private String postureGestureSummariesJson;
+    private String postureTimelineJson;
+    private String posturePenaltyBreakdownJson;
+    private String postureRecommendationsJson;
+    private String postureRenderedVideoUrl;
+
+    // Error handling
+    private String errorMessage;
+    private Instant processingStartedAt;
+
+    // Timestamps
+    private Instant createdAt;
+    private Instant completedAt;
+
+    private Evaluation() {}
+
+    private Evaluation(EvaluationId id, SessionId sessionId, UserId userId, String sessionType) {
+        super(id);
+        this.sessionId = sessionId;
+        this.userId = userId;
+        this.sessionType = sessionType;
+        this.status = EvaluationStatus.PENDING;
+        this.createdAt = Instant.now();
+    }
+
+    // ===== Factory =====
+
+    public static ResultT<Evaluation> create(SessionId sessionId, UserId userId, String sessionType) {
+        return ResultT.success(new Evaluation(EvaluationId.create(), sessionId, userId, sessionType));
+    }
+
+    // ===== Reconstitution =====
+
+    public static Evaluation reconstitute(
+            EvaluationId id,
+            SessionId sessionId,
+            UserId userId,
+            EvaluationStatus status,
+            String sessionType,
+            String transcriptionText,
+            String transcriptionJson,
+            String transcriptionWordsJson,
+            String transcriptionRawJson,
+            Double durationSeconds,
+            String detectedLanguage,
+            Integer wordsPerMinute,
+            Integer totalWords,
+            Integer fillerWordCount,
+            Integer pauseCount,
+            Double clarityScore,
+            String metricsJson,
+            String feedbackJson,
+            String overallSummary,
+            String strengthsJson,
+            String improvementsJson,
+            Double postureScore,
+            String postureGrade,
+            String postureGestureSummariesJson,
+            String postureTimelineJson,
+            String posturePenaltyBreakdownJson,
+            String postureRecommendationsJson,
+            String postureRenderedVideoUrl,
+            String errorMessage,
+            Instant processingStartedAt,
+            Instant createdAt,
+            Instant completedAt
+    ) {
+        var evaluation = new Evaluation();
+        evaluation.id = id;
+        evaluation.sessionId = sessionId;
+        evaluation.userId = userId;
+        evaluation.status = status;
+        evaluation.sessionType = sessionType;
+        evaluation.transcriptionText = transcriptionText;
+        evaluation.transcriptionJson = transcriptionJson;
+        evaluation.transcriptionWordsJson = transcriptionWordsJson;
+        evaluation.transcriptionRawJson = transcriptionRawJson;
+        evaluation.durationSeconds = durationSeconds;
+        evaluation.detectedLanguage = detectedLanguage;
+        evaluation.wordsPerMinute = wordsPerMinute;
+        evaluation.totalWords = totalWords;
+        evaluation.fillerWordCount = fillerWordCount;
+        evaluation.pauseCount = pauseCount;
+        evaluation.clarityScore = clarityScore;
+        evaluation.metricsJson = metricsJson;
+        evaluation.feedbackJson = feedbackJson;
+        evaluation.overallSummary = overallSummary;
+        evaluation.strengthsJson = strengthsJson;
+        evaluation.improvementsJson = improvementsJson;
+        evaluation.postureScore = postureScore;
+        evaluation.postureGrade = postureGrade;
+        evaluation.postureGestureSummariesJson = postureGestureSummariesJson;
+        evaluation.postureTimelineJson = postureTimelineJson;
+        evaluation.posturePenaltyBreakdownJson = posturePenaltyBreakdownJson;
+        evaluation.postureRecommendationsJson = postureRecommendationsJson;
+        evaluation.postureRenderedVideoUrl = postureRenderedVideoUrl;
+        evaluation.errorMessage = errorMessage;
+        evaluation.processingStartedAt = processingStartedAt;
+        evaluation.createdAt = createdAt;
+        evaluation.completedAt = completedAt;
+        return evaluation;
+    }
+
+    // ===== Processing Operations =====
+
+    public Result startTranscription() {
+        if (status != EvaluationStatus.PENDING) {
+            return Result.failure(EvaluationErrors.ALREADY_COMPLETED);
+        }
+        this.status = EvaluationStatus.TRANSCRIBING;
+        this.processingStartedAt = Instant.now();
+        return Result.success();
+    }
+
+    public Result completeTranscription(
+            String fullText,
+            String segmentsJson,
+            String wordsJson,
+            String rawJson,
+            double durationSeconds,
+            String detectedLanguage
+    ) {
+        this.transcriptionText = fullText;
+        this.transcriptionJson = segmentsJson;
+        this.transcriptionWordsJson = wordsJson;
+        this.transcriptionRawJson = rawJson;
+        this.durationSeconds = durationSeconds;
+        this.detectedLanguage = detectedLanguage;
+        this.status = EvaluationStatus.ANALYZING;
+        this.processingStartedAt = Instant.now();
+        return Result.success();
+    }
+
+    public Result completeAnalysis(
+            int wordsPerMinute,
+            int totalWords,
+            int fillerWordCount,
+            int pauseCount,
+            double clarityScore,
+            String metricsJson,
+            String feedbackJson,
+            String overallSummary,
+            String strengthsJson,
+            String improvementsJson
+    ) {
+        this.wordsPerMinute = wordsPerMinute;
+        this.totalWords = totalWords;
+        this.fillerWordCount = fillerWordCount;
+        this.pauseCount = pauseCount;
+        this.clarityScore = clarityScore;
+        this.metricsJson = metricsJson;
+        this.feedbackJson = feedbackJson;
+        this.overallSummary = overallSummary;
+        this.strengthsJson = strengthsJson;
+        this.improvementsJson = improvementsJson;
+        this.status = EvaluationStatus.COMPLETED;
+        this.processingStartedAt = null;
+        this.completedAt = Instant.now();
+        return Result.success();
+    }
+
+    public Result fail(String errorMessage) {
+        this.status = EvaluationStatus.FAILED;
+        this.errorMessage = truncate(errorMessage, MAX_ERROR_MESSAGE_LENGTH);
+        this.processingStartedAt = null;
+        this.completedAt = Instant.now();
+        return Result.success();
+    }
+
+    public void setPostureResults(Double postureScore, String postureGrade,
+            String postureGestureSummariesJson, String postureTimelineJson,
+            String posturePenaltyBreakdownJson, String postureRecommendationsJson,
+            String postureRenderedVideoUrl) {
+        this.postureScore = postureScore;
+        this.postureGrade = postureGrade;
+        this.postureGestureSummariesJson = postureGestureSummariesJson;
+        this.postureTimelineJson = postureTimelineJson;
+        this.posturePenaltyBreakdownJson = posturePenaltyBreakdownJson;
+        this.postureRecommendationsJson = postureRecommendationsJson;
+        this.postureRenderedVideoUrl = postureRenderedVideoUrl;
+    }
+
+    public boolean isProcessingStale(Instant cutoff) {
+        if (status == EvaluationStatus.PENDING) {
+            return true;
+        }
+        if (status != EvaluationStatus.TRANSCRIBING && status != EvaluationStatus.ANALYZING) {
+            return false;
+        }
+        return processingStartedAt == null || processingStartedAt.isBefore(cutoff);
+    }
+
+    public boolean canRetry(Instant cutoff) {
+        if (status != EvaluationStatus.FAILED) {
+            return false;
+        }
+        return completedAt == null || completedAt.isBefore(cutoff);
+    }
+
+    public Result retry() {
+        if (status == EvaluationStatus.COMPLETED) {
+            return Result.failure(EvaluationErrors.ALREADY_COMPLETED);
+        }
+        boolean hasTranscription = transcriptionText != null && !transcriptionText.isBlank();
+        this.status = hasTranscription ? EvaluationStatus.ANALYZING : EvaluationStatus.PENDING;
+        this.errorMessage = null;
+        this.completedAt = null;
+        this.processingStartedAt = hasTranscription ? Instant.now() : null;
+        return Result.success();
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength - 3) + "...";
+    }
+
+    // ===== Getters =====
+
+    public SessionId getSessionId() {
+        return sessionId;
+    }
+
+    public UserId getUserId() {
+        return userId;
+    }
+
+    public EvaluationStatus getStatus() {
+        return status;
+    }
+
+    public String getSessionType() {
+        return sessionType;
+    }
+
+    public String getTranscriptionText() {
+        return transcriptionText;
+    }
+
+    public String getTranscriptionJson() {
+        return transcriptionJson;
+    }
+
+    public String getTranscriptionWordsJson() {
+        return transcriptionWordsJson;
+    }
+
+    public String getTranscriptionRawJson() {
+        return transcriptionRawJson;
+    }
+
+    public Double getDurationSeconds() {
+        return durationSeconds;
+    }
+
+    public String getDetectedLanguage() {
+        return detectedLanguage;
+    }
+
+    public Integer getWordsPerMinute() {
+        return wordsPerMinute;
+    }
+
+    public Integer getTotalWords() {
+        return totalWords;
+    }
+
+    public Integer getFillerWordCount() {
+        return fillerWordCount;
+    }
+
+    public Integer getPauseCount() {
+        return pauseCount;
+    }
+
+    public Double getClarityScore() {
+        return clarityScore;
+    }
+
+    public String getMetricsJson() {
+        return metricsJson;
+    }
+
+    public String getFeedbackJson() {
+        return feedbackJson;
+    }
+
+    public String getOverallSummary() {
+        return overallSummary;
+    }
+
+    public String getStrengthsJson() {
+        return strengthsJson;
+    }
+
+    public String getImprovementsJson() {
+        return improvementsJson;
+    }
+
+    public Double getPostureScore() {
+        return postureScore;
+    }
+
+    public String getPostureGrade() {
+        return postureGrade;
+    }
+
+    public String getPostureGestureSummariesJson() {
+        return postureGestureSummariesJson;
+    }
+
+    public String getPostureTimelineJson() {
+        return postureTimelineJson;
+    }
+
+    public String getPosturePenaltyBreakdownJson() {
+        return posturePenaltyBreakdownJson;
+    }
+
+    public String getPostureRecommendationsJson() {
+        return postureRecommendationsJson;
+    }
+
+    public String getPostureRenderedVideoUrl() {
+        return postureRenderedVideoUrl;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public Instant getProcessingStartedAt() {
+        return processingStartedAt;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getCompletedAt() {
+        return completedAt;
+    }
+
+    public boolean isCompleted() {
+        return status == EvaluationStatus.COMPLETED;
+    }
+
+    public boolean isFailed() {
+        return status == EvaluationStatus.FAILED;
+    }
+}

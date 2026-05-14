@@ -1,0 +1,73 @@
+services:
+  ai-analyzer:
+    build:
+      context: ../ai
+      dockerfile: Dockerfile
+    container_name: voxly-ai-analyzer-prod
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:v1.26
+    container_name: voxly-mailpit-prod
+    restart: unless-stopped
+    ports:
+      - "11025:1025"
+      - "18025:8025"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voxly-backend-prod
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      POSTURE_ANALYZER_URL: http://ai-analyzer:8000
+      POSTURE_ANALYZER_RENDER_BASE: http://localhost:8001
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+    depends_on:
+      ai-analyzer:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health/readiness"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+        VITE_AUTH_BYPASS: ${VITE_AUTH_BYPASS:-false}
+    container_name: voxly-frontend-prod
+    restart: unless-stopped
+    env_file:
+      - ../frontend/.env
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+

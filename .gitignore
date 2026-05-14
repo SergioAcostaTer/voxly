@@ -1,0 +1,108 @@
+# ------------------------------
+# General
+# ------------------------------
+.DS_Store
+Thumbs.db
+*.log
+logs
+*.tmp
+*.swp
+
+# ------------------------------
+# Environment files
+# ------------------------------
+.env
+.env.*
+!.env.example
+
+# ------------------------------
+# Node / Vite / React
+# ------------------------------
+node_modules/
+dist/
+dist-ssr/
+.vite/
+coverage/
+
+# Vite cache
+node_modules/.vite
+
+# ------------------------------
+# Java / Spring Boot
+# ------------------------------
+target/
+build/
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+.gradle/
+build/
+
+# ------------------------------
+# IDEs
+# ------------------------------
+
+# VSCode
+.vscode/
+
+# IntelliJ / JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# ------------------------------
+# OS files
+# ------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+ehthumbs.db
+Desktop.ini
+
+# ------------------------------
+# Testing / coverage
+# ------------------------------
+coverage/
+*.lcov
+
+# ------------------------------
+# Python
+# ------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# AI service generated outputs
+ai/resultado*.mp4
+ai/resultado*.json
+ai/videos/*.mp4
+!ai/videos/.gitkeep
+
+# ------------------------------
+# Misc
+# ------------------------------
+*.pid
+*.seed
+*.pid.lock
