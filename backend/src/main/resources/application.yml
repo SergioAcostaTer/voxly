@@ -37,6 +37,15 @@ spring:
       max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:500MB}
       max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:500MB}
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            scope: openid,email,profile
+
   mail:
     host: ${SMTP_HOST}
     port: ${SMTP_PORT}
@@ -60,6 +69,7 @@ cloudflare:
 
 openai:
   apiKey: ${OPENAI_API_KEY}
+  baseUrl: ${OPENAI_BASE_URL:https://api.openai.com/v1}
   timeout:
     connect-ms: ${OPENAI_TIMEOUT_CONNECT_MS:5000}
     read-ms: ${OPENAI_TIMEOUT_READ_MS:120000}

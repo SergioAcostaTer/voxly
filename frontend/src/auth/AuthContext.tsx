@@ -2,6 +2,7 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
     type PropsWithChildren,
 } from 'react'
@@ -14,6 +15,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<User | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const bootstrapStarted = useRef(false)
 
   const loadProfileWithRefreshFallback = useCallback(async (token: string) => {
     try {
@@ -88,6 +90,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [loadProfileWithRefreshFallback])
 
   useEffect(() => {
+    if (bootstrapStarted.current) return
+    bootstrapStarted.current = true
     void bootstrapSession()
   }, [bootstrapSession])
 

@@ -34,6 +34,34 @@ import imageio_ffmpeg
 from .analyzer import PresentationAnalyzer, report_to_dict
 
 
+def _reencode_for_browser(path: str) -> str:
+    """Re-encode an mp4v/MPEG-4 Part 2 video to H.264 so browsers can play it.
+    Replaces the file in-place. Returns the path (same as input)."""
+    tmp = path + ".h264.mp4"
+    try:
+        ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        cmd = [
+            ffmpeg, "-y", "-i", path,
+            "-c:v", "libx264", "-preset", "ultrafast",
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            "-an",
+            tmp,
+        ]
+        proc = subprocess.run(cmd, capture_output=True)
+        if proc.returncode == 0 and os.path.exists(tmp) and os.path.getsize(tmp) > 0:
+            os.replace(tmp, path)
+    except Exception:
+        pass
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.unlink(tmp)
+            except Exception:
+                pass
+    return path
+
+
 def _ensure_readable_video(path: str) -> str:
     """Browser-recorded WebM streams often lack a Cues/duration header, so OpenCV
     only reads a single frame. Remux to MP4 with ffmpeg when that happens."""
@@ -209,6 +237,9 @@ async def analyze_sync(
     finally:
         os.unlink(tmp_path)
 
+    if output_video and os.path.exists(output_video):
+        _reencode_for_browser(output_video)
+
     metadata: dict = {
         "filename": video.filename,
         "fast_mode": fast,
@@ -293,6 +324,8 @@ async def analyze_async(
                 output_video=output_video,
                 progress_cb=_progress,
             )
+            if output_video and os.path.exists(output_video):
+                _reencode_for_browser(output_video)
             with _jobs_lock:
                 job_data = {
                     "status": "done",

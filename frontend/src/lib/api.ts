@@ -25,6 +25,7 @@ export class ApiClientError extends Error {
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+let _refreshTokenPromise: Promise<{ accessToken: string; accessTokenExpiresAt: string }> | null = null
 const AUTH_BASE_CANDIDATES = [
   import.meta.env.VITE_AUTH_BASE_PATH,
   '/v1/auth',
@@ -190,12 +191,13 @@ export const api = {
   },
 
   requestAccessToken() {
-    return requestAuth<{ accessToken: string; accessTokenExpiresAt: string }>(
-      '/refresh-token',
-      {
-        method: 'POST',
-      },
-    )
+    if (!_refreshTokenPromise) {
+      _refreshTokenPromise = requestAuth<{ accessToken: string; accessTokenExpiresAt: string }>(
+        '/refresh-token',
+        { method: 'POST' },
+      ).finally(() => { _refreshTokenPromise = null })
+    }
+    return _refreshTokenPromise
   },
 
   logout() {

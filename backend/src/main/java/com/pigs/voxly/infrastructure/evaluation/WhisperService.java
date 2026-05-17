@@ -21,7 +21,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Service
 public class WhisperService {
     private static final Logger logger = LoggerFactory.getLogger(WhisperService.class);
-    private static final String WHISPER_API_URL = "https://api.openai.com/v1/audio/transcriptions";
+
+    @Value("${openai.whisper.baseUrl:https://api.openai.com/v1/audio/transcriptions}")
+    private String whisperApiUrl;
 
     @Value("${openai.apiKey}")
     private String apiKey;
@@ -82,7 +84,7 @@ public class WhisperService {
             HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
             // Call API with timeout handling
-            String response = restTemplate.postForObject(WHISPER_API_URL, requestEntity, String.class);
+            String response = restTemplate.postForObject(whisperApiUrl, requestEntity, String.class);
 
             if (response == null) {
                 throw new WhisperException("Empty response from Whisper API");

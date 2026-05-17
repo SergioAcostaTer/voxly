@@ -157,6 +157,7 @@ export function SessionDetailPage() {
   const [activeReviewLane, setActiveReviewLane] = useState<ReviewLane>('transcript')
   const splitContainerRef = useRef<HTMLDivElement>(null)
   const isDraggingSplitRef = useRef(false)
+  const isScrubbingRef = useRef(false)
   const streamAbortRef = useRef<AbortController | null>(null)
   const pendingSeekRef = useRef<number | null>(null)
 
@@ -290,17 +291,17 @@ export function SessionDetailPage() {
     }
   }, [shouldPoll, fetchData, accessToken, sessionId])
 
-  // Fallback polling for posture when evaluation is complete but posture hasn't arrived yet.
-  // The SSE stream keeps polling too, but this interval ensures a fetch even if the SSE drops.
+  // Fallback polling while any processing state is active.
+  // SSE handles real-time events; this interval catches cases where the stream drops or misses the completion event.
   useEffect(() => {
-    if (!posturePending || !accessToken || !sessionId) return
+    if (!shouldPoll || !accessToken || !sessionId) return
 
     const interval = setInterval(() => {
       fetchData()
-    }, 4000)
+    }, 5000)
 
     return () => clearInterval(interval)
-  }, [posturePending, fetchData, accessToken, sessionId])
+  }, [shouldPoll, fetchData, accessToken, sessionId])
 
   const reanalysisTriggeredRef = useRef(false)
 
@@ -486,7 +487,7 @@ export function SessionDetailPage() {
     // While the user is actively dragging the seek slider, the slider's local
     // value drives currentTime. Ignore transient timeupdate events so the thumb
     // doesn't snap back to wherever the underlying video currently reports.
-    if (!isScrubbing) {
+    if (!isScrubbingRef.current) {
       setCurrentTime(time)
     }
 
@@ -520,7 +521,7 @@ export function SessionDetailPage() {
     if (!mediaRef.current) return
     isSeekingRef.current = false
     const time = mediaRef.current.currentTime
-    if (!isScrubbing) {
+    if (!isScrubbingRef.current) {
       setCurrentTime(time)
     }
 
@@ -922,12 +923,12 @@ export function SessionDetailPage() {
                 ) : (
                   <div
                     className={cn(
-                      'flex w-full items-center justify-center bg-black',
+                      'flex w-full items-center justify-center bg-black overflow-hidden',
                       isGuidedFullscreen
-                        ? 'shrink-0 max-h-[42vh] lg:max-h-[45vh]'
+                        ? 'shrink-0 h-[42vh] lg:h-[45vh]'
                         : guidedModeEnabled
-                          ? 'max-h-[55vh] lg:max-h-[50vh]'
-                          : 'max-h-[65vh] lg:max-h-[60vh]',
+                          ? 'h-[55vh] lg:h-[50vh]'
+                          : 'h-[65vh] lg:h-[60vh]',
                     )}
                   >
                     <video
@@ -935,7 +936,7 @@ export function SessionDetailPage() {
                         mediaRef.current = node
                       }}
                       src={mediaUrl}
-                      className="h-auto max-h-full w-auto max-w-full object-contain"
+                      className="h-full w-full object-contain"
                       style={MIRRORED_VIDEO_STYLE}
                       preload="metadata"
                       playsInline
@@ -966,11 +967,13 @@ export function SessionDetailPage() {
                     aria-valuenow={Math.min(currentTime, currentDuration ?? currentTime)}
                     aria-valuetext={formatTimestamp(currentTime)}
                     onPointerDown={(event) => {
+                      isScrubbingRef.current = true
                       setIsScrubbing(true)
                       handleSeeking()
                       event.currentTarget.setPointerCapture(event.pointerId)
                     }}
                     onPointerUp={(event) => {
+                      isScrubbingRef.current = false
                       setIsScrubbing(false)
                       try {
                         event.currentTarget.releasePointerCapture(event.pointerId)
@@ -978,7 +981,10 @@ export function SessionDetailPage() {
                         // ignore
                       }
                     }}
-                    onPointerCancel={() => setIsScrubbing(false)}
+                    onPointerCancel={() => {
+                      isScrubbingRef.current = false
+                      setIsScrubbing(false)
+                    }}
                     onChange={(event) => {
                       const nextTime = Number(event.target.value)
                       if (!Number.isNaN(nextTime)) {
@@ -1769,21 +1775,38 @@ export function SessionDetailPage() {
                   </p>
                 )}
 
-                {evaluation.posture?.renderedVideoUrl && (
-                  <div className="mt-4">
-                    <p className="mb-2 text-sm font-medium text-foreground">Annotated analysis video</p>
-                    <div className="overflow-hidden rounded-xl border border-border">
-                      <video
-                        controls
-                        className="w-full"
-                        src={evaluation.posture.renderedVideoUrl}
-                        style={{ maxHeight: 360 }}
-                      >
-                        Your browser does not support the video tag.
-                      </video>
+                {evaluation.posture?.renderedVideoUrl && (() => {
+                  const videoSrc = evaluation.posture.renderedVideoUrl.startsWith('http')
+                    ? evaluation.posture.renderedVideoUrl
+                    : `${API_BASE_URL}${evaluation.posture.renderedVideoUrl}`
+                  return (
+                    <div className="mt-4">
+                      <p className="mb-2 text-sm font-medium text-foreground">Annotated analysis video</p>
+                      <div className="overflow-hidden rounded-xl border border-border bg-black">
+                        <video
+                          controls
+                          className="w-full"
+                          src={videoSrc}
+                          style={{ maxHeight: 360 }}
+                          onError={() => {
+                            const el = document.getElementById('annotated-video-fallback')
+                            if (el) el.style.display = 'block'
+                          }}
+                        >
+                          Your browser does not support video playback.
+                        </video>
+                        <div
+                          id="annotated-video-fallback"
+                          style={{ display: 'none' }}
+                          className="p-3 text-sm text-muted-foreground"
+                        >
+                          Video could not be loaded.{' '}
+                          <a href={videoSrc} download className="underline text-primary">Download it</a> to watch locally.
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
               </>
             ) : (
               <div className="space-y-4">

@@ -43,7 +43,9 @@ public class OpenAiTranscriptionService implements TranscriptionService {
         log.info("Starting Whisper transcription for: {}", filePath.getFileName());
 
         try {
-            if (aiProperties.apiKey() == null || aiProperties.apiKey().isBlank()) {
+            boolean usingLocalServer = aiProperties.baseUrl() != null
+                    && !aiProperties.baseUrl().contains("api.openai.com");
+            if (!usingLocalServer && (aiProperties.apiKey() == null || aiProperties.apiKey().isBlank())) {
                 return ResultT.failure(Error.failure(
                         "Transcription.OpenAiNotConfigured",
                         "OPENAI_API_KEY is not configured"
